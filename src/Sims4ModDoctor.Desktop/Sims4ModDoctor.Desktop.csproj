@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Sims4ModDoctor.ico</ApplicationIcon>
+    <AssemblyName>Sims4ModDoctor</AssemblyName>
+    <RootNamespace>Sims4ModDoctor.Desktop</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sims4ModDoctor.Core\Sims4ModDoctor.Core.csproj" />
+  </ItemGroup>
+</Project>

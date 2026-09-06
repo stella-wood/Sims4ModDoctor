@@ -1,0 +1,450 @@
+<Window x:Class="Sims4ModDoctor.Desktop.MainWindow"
+        x:Name="RootWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Sims 4 Mod Doctor"
+        Width="1180"
+        Height="780"
+        MinWidth="920"
+        MinHeight="640"
+        Background="{StaticResource WindowBrush}"
+        FontFamily="Microsoft YaHei UI"
+        WindowStartupLocation="CenterScreen">
+    <Grid Background="{StaticResource WindowBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="54" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{StaticResource WindowBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <Grid Margin="28,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="首页"
+                            Command="{Binding GoHomeCommand}"
+                            Style="{StaticResource ActiveHeaderNavButtonStyle}"
+                            Visibility="{Binding IsHomeVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Button Content="首页"
+                            Command="{Binding GoHomeCommand}"
+                            Style="{StaticResource HeaderNavButtonStyle}"
+                            Visibility="{Binding IsScannerVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Border Width="1"
+                            Height="18"
+                            Margin="20,0"
+                            Background="{StaticResource BorderBrush}" />
+                    <Button Content="重复检测"
+                            Command="{Binding OpenDuplicateScannerCommand}"
+                            Style="{StaticResource HeaderNavButtonStyle}"
+                            Visibility="{Binding IsHomeVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Button Content="重复检测"
+                            Command="{Binding OpenDuplicateScannerCommand}"
+                            Style="{StaticResource ActiveHeaderNavButtonStyle}"
+                            Visibility="{Binding IsScannerVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Button Margin="28,0,0,0"
+                            Content="冲突检测"
+                            IsEnabled="False"
+                            Style="{StaticResource HeaderNavButtonStyle}" />
+                </StackPanel>
+                <Button Grid.Column="2"
+                        Content="设置"
+                        IsEnabled="False"
+                        Style="{StaticResource HeaderNavButtonStyle}" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1"
+              Visibility="{Binding IsHomeVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch">
+                <Grid Margin="0,90,0,40">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="0.75*" />
+                        <ColumnDefinition Width="8*" />
+                        <ColumnDefinition Width="1.25*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="1">
+                    <TextBlock Text="让 Mod 文件夹清晰可控" FontSize="35" Style="{StaticResource DisplayTextStyle}" />
+                    <TextBlock Margin="0,10,0,34"
+                               Text="重复识别 · 冲突分析 · 报错定位"
+                               Foreground="{StaticResource MutedBrush}"
+                               Style="{StaticResource BodyTextStyle}"
+                               FontSize="16" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="20" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0"
+                                Style="{StaticResource CardStyle}"
+                                MinHeight="246"
+                                Height="{Binding ActualWidth, RelativeSource={RelativeSource Self}, Converter={StaticResource MultiplyConverter}, ConverterParameter=0.547}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="0.32*" />
+                                    <RowDefinition Height="0.49*" />
+                                    <RowDefinition Height="0.19*" />
+                                </Grid.RowDefinitions>
+                                <Border Width="46" Height="46" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="6" Background="{StaticResource AccentSoftBrush}">
+                                    <TextBlock Text="≡" Foreground="{StaticResource AccentBrush}" FontSize="26" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel Grid.Row="1" VerticalAlignment="Top">
+                                    <TextBlock Text="重复文件检测" FontSize="22" FontWeight="SemiBold" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock Margin="0,8,0,0" Text="按文件内容识别完全相同的副本" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Style="{StaticResource BodyTextStyle}" FontSize="14" LineHeight="22" />
+                                </StackPanel>
+                                <Button Grid.Row="2" Content="进入检测" Command="{Binding OpenDuplicateScannerCommand}" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Left"
+                                        VerticalAlignment="Bottom" />
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="2"
+                                Style="{StaticResource CardStyle}"
+                                MinHeight="246"
+                                Height="{Binding ActualWidth, RelativeSource={RelativeSource Self}, Converter={StaticResource MultiplyConverter}, ConverterParameter=0.547}"
+                                Opacity="0.62">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="0.32*" />
+                                    <RowDefinition Height="0.49*" />
+                                    <RowDefinition Height="0.19*" />
+                                </Grid.RowDefinitions>
+                                <Border Width="46" Height="46" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="6" Background="#E3E0DB">
+                                    <TextBlock Text="◇" Foreground="{StaticResource MutedBrush}" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel Grid.Row="1" VerticalAlignment="Top">
+                                    <TextBlock Text="Mod 冲突检测" FontSize="22" FontWeight="SemiBold" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock Margin="0,8,0,0" Text="分析资源覆盖、文件健康与运行报错" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Style="{StaticResource BodyTextStyle}" FontSize="14" LineHeight="22" />
+                                </StackPanel>
+                                <Border Grid.Row="2" Background="#E4E0DB" CornerRadius="4" Padding="14,9" HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                                    <TextBlock Text="尚未开放" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold" />
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+
+        <Grid Grid.Row="1"
+              Margin="28,18,28,28"
+              Visibility="{Binding IsScannerVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="31*" MinWidth="300" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="69*" />
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="24" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Button Content="←  返回"
+                            Command="{Binding GoHomeCommand}"
+                            Style="{StaticResource HeaderBackButtonStyle}"
+                            HorizontalAlignment="Left" />
+                    <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="18">
+                        <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="检查范围" FontSize="18" Style="{StaticResource SectionTitleTextStyle}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="＋ 添加" Command="{Binding AddSourceCommand}" Style="{StaticResource SecondaryButtonStyle}" Padding="12,7" />
+                        </Grid>
+
+                        <Border Grid.Row="1" Margin="0,16,0,12" Background="#EAE7E2" CornerRadius="4" Padding="12">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="当前 Mods 文件夹" Style="{StaticResource SectionTitleTextStyle}" FontSize="12" />
+                                <TextBlock Grid.Row="1" Margin="0,5,0,0" Text="{Binding ModsRootDisplay}" TextTrimming="CharacterEllipsis" ToolTip="{Binding ModsRootDisplay}" Foreground="{StaticResource MutedBrush}" Style="{StaticResource DataTextStyle}" FontSize="11" />
+                            </Grid>
+                        </Border>
+
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding Sources}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="2,11">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox IsChecked="{Binding IsEnabled}"
+                                                          IsEnabled="{Binding DataContext.CanEditSources, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                          Margin="0,0,10,0" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource SectionTitleTextStyle}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Path}" Foreground="{StaticResource MutedBrush}" Style="{StaticResource DataTextStyle}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}" />
+                                                </StackPanel>
+                                                <Button Grid.Column="2"
+                                                        Content="×"
+                                                        Command="{Binding DataContext.RemoveSourceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Foreground="{StaticResource MutedBrush}"
+                                                        FontSize="18"
+                                                        Padding="7,2"
+                                                        Cursor="Hand" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <StackPanel Grid.Row="3" Margin="0,16,0,0">
+                            <ProgressBar Height="7"
+                                         Maximum="{Binding ProgressMaximum, Mode=OneWay}"
+                                         Value="{Binding ProgressValue, Mode=OneWay}"
+                                         IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}"
+                                         Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <StackPanel Margin="0,10,0,2" Visibility="{Binding IsStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="{Binding StatusText}" Style="{StaticResource SectionTitleTextStyle}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,2,0,0" Text="{Binding StatusDetail}" Foreground="{StaticResource MutedBrush}" Style="{StaticResource DataTextStyle}" FontSize="11" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Grid Margin="0,14,0,0">
+                                <Button Content="开始扫描" Command="{Binding StartScanCommand}" Style="{StaticResource PrimaryButtonStyle}" />
+                                <Button Content="取消扫描"
+                                        Command="{Binding CancelScanCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            </Grid>
+                        </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Border Padding="20,17" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="扫描结果" FontSize="18" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock Foreground="{StaticResource MutedBrush}" Style="{StaticResource DataTextStyle}" FontSize="12">
+                                        <Run Text="{Binding DuplicateGroupCount, Mode=OneWay}" /><Run Text=" 组 · " /><Run Text="{Binding DuplicateFileCount, Mode=OneWay}" /><Run Text=" 个文件 · 已选 " /><Run Text="{Binding SelectedFileCount, Mode=OneWay}" />
+                                    </TextBlock>
+                                </StackPanel>
+                                <Button Grid.Column="1" Margin="0,0,8,0" Content="清空勾选" Command="{Binding ClearSelectionCommand}" Style="{StaticResource SecondaryButtonStyle}" Padding="12,7" />
+                                <Button Grid.Column="2" Content="一键勾选" Command="{Binding ApplySuggestionsCommand}" Style="{StaticResource PrimaryButtonStyle}" Padding="12,7" />
+                            </Grid>
+                        </Border>
+
+                        <Grid Grid.Row="1">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Visibility="{Binding HasNoResults, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="尚未扫描" Foreground="{StaticResource MutedBrush}" FontSize="15" HorizontalAlignment="Center" />
+                            </StackPanel>
+
+                            <ListBox ItemsSource="{Binding Groups}"
+                                     Padding="20,6,8,12"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ScrollViewer.CanContentScroll="True"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     VirtualizingPanel.IsVirtualizing="True"
+                                     VirtualizingPanel.VirtualizationMode="Recycling"
+                                     Visibility="{Binding HasResults, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0" />
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="BorderThickness" Value="0" />
+                                        <Setter Property="Focusable" Value="False" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <ContentPresenter Content="{TemplateBinding Content}"
+                                                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource PlainExpanderStyle}">
+                                                <Expander.Header>
+                                                    <Grid Margin="0,6" HorizontalAlignment="Stretch">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <CheckBox Margin="0,0,10,0"
+                                                                  AutomationProperties.Name="{Binding GroupLabel}"
+                                                                  IsChecked="{Binding IsSuggestionSelected, Mode=TwoWay}"
+                                                                  ToolTip="按建议勾选本组" />
+                                                        <StackPanel Grid.Column="1">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Margin="0,3,9,0"
+                                                                           Text="{Binding GroupLabel}"
+                                                                           Foreground="{StaticResource AccentBrush}"
+                                                                           FontSize="11"
+                                                                           FontWeight="SemiBold" />
+                                                                <TextBlock Text="{Binding Title}" Style="{StaticResource SectionTitleTextStyle}" FontSize="15" />
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" Style="{StaticResource DataTextStyle}" FontSize="11" />
+                                                        </StackPanel>
+                                                        <Border Grid.Column="2"
+                                                                Background="{StaticResource AccentSoftBrush}"
+                                                                CornerRadius="3"
+                                                                Padding="9,4"
+                                                                VerticalAlignment="Center"
+                                                                Visibility="{Binding HasSectionLabel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                            <TextBlock Text="{Binding SectionTitle}" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="SemiBold" />
+                                                        </Border>
+                                                    </Grid>
+                                                </Expander.Header>
+                                                <Border Margin="20,3,0,7" Background="#F3F1ED" Padding="8,4">
+                                                    <ItemsControl ItemsSource="{Binding Files}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid Margin="8,9">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="Auto" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                        <ColumnDefinition Width="Auto" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <CheckBox IsChecked="{Binding IsSelected}" Margin="0,0,11,0" />
+                                                                    <StackPanel Grid.Column="1">
+                                                                        <TextBlock Text="{Binding FileName}" Style="{StaticResource FileNameTextStyle}" TextTrimming="CharacterEllipsis" />
+                                                                        <TextBlock Text="{Binding Path}" Foreground="{StaticResource MutedBrush}" Style="{StaticResource DataTextStyle}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}" />
+                                                                    </StackPanel>
+                                                                    <TextBlock Grid.Column="2"
+                                                                               Text="建议保留"
+                                                                               Foreground="{StaticResource AccentBrush}"
+                                                                               FontSize="10"
+                                                                               FontWeight="SemiBold"
+                                                                               VerticalAlignment="Center"
+                                                                               Margin="10,0,0,0"
+                                                                               Visibility="{Binding IsSuggestedKeep, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Border>
+                                            </Expander>
+                                            <Line Height="1"
+                                                  Margin="20,0,0,10"
+                                                  X1="0"
+                                                  X2="1"
+                                                  Stretch="Fill"
+                                                  Stroke="#D8D3CC"
+                                                  StrokeDashArray="2,4"
+                                                  StrokeThickness="1"
+                                                  Opacity="0.78"
+                                                  SnapsToDevicePixels="True" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+
+                        <Border Grid.Row="2"
+                                Padding="20,11,36,11"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="0,1,0,0"
+                                Visibility="{Binding HasResults, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="ToggleAllGroupsButton"
+                                        Grid.Column="0"
+                                        Width="24"
+                                        Height="24"
+                                        Command="{Binding ToggleAllGroupsCommand}"
+                                        ToolTip="{Binding ExpandCollapseToolTip}"
+                                        Style="{StaticResource BareIconButtonStyle}">
+                                    <Grid Width="16" Height="16">
+                                        <Path Data="M 1,2 L 15,2 M 1,8 L 15,8 M 1,14 L 15,14"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              StrokeThickness="1.35"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round"
+                                              Visibility="{Binding ShowCollapseAllIcon, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        <Path Data="M 1,5 L 15,5 M 1,8 L 15,8 M 1,11 L 15,11"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              StrokeThickness="1.35"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round"
+                                              Visibility="{Binding ShowExpandAllIcon, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </Grid>
+                                </Button>
+                                <TextBlock Grid.Column="1"
+                                           Margin="10,0,0,0"
+                                           Text="{Binding FileActionStatusText}"
+                                           Foreground="{StaticResource MutedBrush}"
+                                           Style="{StaticResource DataTextStyle}"
+                                           FontSize="10"
+                                           VerticalAlignment="Center"
+                                           Visibility="{Binding HasFileActionStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <Button Grid.Column="2"
+                                        Margin="8,0,0,0"
+                                        Content="撤回"
+                                        Command="{Binding UndoLastDeleteCommand}"
+                                        Style="{StaticResource HeaderBackButtonStyle}"
+                                        Padding="4,2"
+                                        Visibility="{Binding CanUndoLastDelete, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <TextBlock Grid.Column="4" Margin="0,0,16,0" Foreground="{StaticResource MutedBrush}" Style="{StaticResource DataTextStyle}" FontSize="11" VerticalAlignment="Center">
+                                    <Run Text="总计 " /><Run Text="{Binding DuplicateSizeText, Mode=OneWay}" /><Run Text="，已选 " /><Run Text="{Binding SelectedSizeText, Mode=OneWay}" />
+                                </TextBlock>
+                                <Button Grid.Column="5"
+                                        Content="删除所选"
+                                        Command="{Binding DeleteSelectedCommand}"
+                                        ToolTip="将明确勾选的文件移入 Windows 回收站"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Padding="16,8" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

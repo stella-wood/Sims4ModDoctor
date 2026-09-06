@@ -1,0 +1,40 @@
+.tools/
+.tools-state/
+**/bin/
+**/obj/
+.vs/
+artifacts/
+TestResults/
+
+# Internal planning and experiments
+AGENT.md
+docs/
+spikes/
+
+# IDE and per-user settings
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.idea/
+.vscode/
+
+# Logs, coverage, and publishing output
+*.log
+*.pdb
+*.coverage
+coverage/
+coverage-results/
+publish/
+*.pubxml.user
+
+# Local secrets and signing material
+.env
+.env.*
+!.env.example
+*.pfx
+*.snk
+
+# Windows metadata
+Thumbs.db
+Desktop.ini
