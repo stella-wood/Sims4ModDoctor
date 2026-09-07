@@ -12,9 +12,10 @@ public sealed class MainWindowViewModel : ObservableObject
 {
     private readonly DuplicateScanner scanner;
     private readonly IFolderPickerService folderPicker;
-    private readonly DuplicateSettingsStore settingsStore;
+    private readonly IDuplicateSettingsStore settingsStore;
     private readonly IFileActionService fileActionService;
     private readonly IFileActionDialogService fileActionDialogs;
+    private readonly IUnexpectedErrorHandler unexpectedErrorHandler;
     private readonly DuplicateSelectionService selectionService = new();
     private CancellationTokenSource? scanCancellation;
     private IReadOnlyList<DuplicateGroupViewModel> groups = Array.Empty<DuplicateGroupViewModel>();
@@ -28,6 +29,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool isBusy;
     private bool isProgressIndeterminate;
     private string? modsRoot;
+    private bool isModsRootAvailable;
     private bool isStatusVisible;
     private string statusText = string.Empty;
     private string statusDetail = string.Empty;
@@ -40,28 +42,40 @@ public sealed class MainWindowViewModel : ObservableObject
     public MainWindowViewModel(
         DuplicateScanner scanner,
         IFolderPickerService folderPicker,
-        DuplicateSettingsStore settingsStore,
+        IDuplicateSettingsStore settingsStore,
         IFileActionService? fileActionService = null,
-        IFileActionDialogService? fileActionDialogs = null)
+        IFileActionDialogService? fileActionDialogs = null,
+        IUnexpectedErrorHandler? unexpectedErrorHandler = null)
     {
         this.scanner = scanner;
         this.folderPicker = folderPicker;
         this.settingsStore = settingsStore;
         this.fileActionService = fileActionService ?? new FileActionService();
         this.fileActionDialogs = fileActionDialogs ?? new FileActionDialogService();
+        this.unexpectedErrorHandler = unexpectedErrorHandler ?? new UnexpectedErrorHandler();
 
         Sources.CollectionChanged += OnSourcesChanged;
         OpenDuplicateScannerCommand = new RelayCommand(_ => ShowScanner());
         GoHomeCommand = new RelayCommand(_ => ShowHome(), _ => !IsBusy);
         AddSourceCommand = new RelayCommand(_ => AddSource(), _ => !IsBusy);
+        ChangeModsRootCommand = new RelayCommand(_ => ChangeModsRoot(), _ => !IsBusy);
         RemoveSourceCommand = new RelayCommand(RemoveSource, _ => !IsBusy);
-        StartScanCommand = new AsyncRelayCommand(StartScanAsync, CanStartScan);
+        StartScanCommand = new AsyncRelayCommand(
+            StartScanAsync,
+            exception => ReportUnexpectedError("扫描没有完成", exception),
+            CanStartScan);
         CancelScanCommand = new RelayCommand(_ => scanCancellation?.Cancel(), _ => IsBusy);
         ApplySuggestionsCommand = new RelayCommand(_ => ApplySuggestions(), _ => Groups.Count > 0 && !IsBusy);
         ClearSelectionCommand = new RelayCommand(_ => ClearSelection(), _ => SelectedFileCount > 0 && !IsBusy);
         ToggleAllGroupsCommand = new RelayCommand(_ => ToggleAllGroups(), _ => Groups.Count > 0 && !IsBusy);
-        DeleteSelectedCommand = new AsyncRelayCommand(DeleteSelectedAsync, () => SelectedFileCount > 0 && !IsBusy);
-        UndoLastDeleteCommand = new AsyncRelayCommand(UndoLastDeleteAsync, () => this.fileActionService.CanUndoLastDelete && !IsBusy);
+        DeleteSelectedCommand = new AsyncRelayCommand(
+            DeleteSelectedAsync,
+            exception => ReportUnexpectedError("删除没有完成", exception),
+            () => SelectedFileCount > 0 && !IsBusy);
+        UndoLastDeleteCommand = new AsyncRelayCommand(
+            UndoLastDeleteAsync,
+            exception => ReportUnexpectedError("撤回没有完成", exception),
+            () => this.fileActionService.CanUndoLastDelete && !IsBusy);
 
         LoadSettings();
     }
@@ -79,6 +93,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public RelayCommand GoHomeCommand { get; }
 
     public RelayCommand AddSourceCommand { get; }
+
+    public RelayCommand ChangeModsRootCommand { get; }
 
     public RelayCommand RemoveSourceCommand { get; }
 
@@ -138,10 +154,36 @@ public sealed class MainWindowViewModel : ObservableObject
     public string? ModsRoot
     {
         get => modsRoot;
-        private set => SetProperty(ref modsRoot, value);
+        private set
+        {
+            if (SetProperty(ref modsRoot, value))
+            {
+                OnPropertyChanged(nameof(ModsRootDisplay));
+                OnPropertyChanged(nameof(HasModsRoot));
+                OnPropertyChanged(nameof(ModsRootActionText));
+            }
+        }
     }
 
-    public string ModsRootDisplay => string.IsNullOrWhiteSpace(ModsRoot) ? "未检测到" : ModsRoot;
+    public string ModsRootDisplay => string.IsNullOrWhiteSpace(ModsRoot) ? "未设置" : ModsRoot;
+
+    public bool HasModsRoot => !string.IsNullOrWhiteSpace(ModsRoot);
+
+    public string ModsRootActionText => HasModsRoot ? "更改" : "选择";
+
+    public bool IsModsRootAvailable
+    {
+        get => isModsRootAvailable;
+        private set
+        {
+            if (SetProperty(ref isModsRootAvailable, value))
+            {
+                OnPropertyChanged(nameof(HasModsRootAvailabilityWarning));
+            }
+        }
+    }
+
+    public bool HasModsRootAvailabilityWarning => HasModsRoot && !IsModsRootAvailable;
 
     public string StatusText
     {
@@ -226,12 +268,10 @@ public sealed class MainWindowViewModel : ObservableObject
         var settings = settingsStore.Load();
         if (settings is not null)
         {
-            ModsRoot = !string.IsNullOrWhiteSpace(settings.ModsRoot) && Directory.Exists(settings.ModsRoot)
-                ? settings.ModsRoot
-                : null;
-            foreach (var source in settings.Sources.Where(source => Directory.Exists(source.Path)))
+            ModsRoot = NormalizePathOrNull(settings.ModsRoot);
+            foreach (var source in settings.Sources)
             {
-                AddSource(source.Path, source.Enabled);
+                AddSource(source.Path, source.Enabled, saveSettings: false);
             }
         }
 
@@ -246,15 +286,16 @@ public sealed class MainWindowViewModel : ObservableObject
             if (Directory.Exists(defaultModsRoot))
             {
                 ModsRoot = defaultModsRoot;
-                AddSource(defaultModsRoot);
+                AddSource(defaultModsRoot, saveSettings: false);
             }
         }
 
-        OnPropertyChanged(nameof(ModsRootDisplay));
+        RefreshAvailability();
     }
 
     private void ShowScanner()
     {
+        RefreshAvailability();
         IsHomeVisible = false;
         IsScannerVisible = true;
     }
@@ -274,24 +315,46 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    private void AddSource(string path, bool enabled = true)
+    private void ChangeModsRoot()
     {
-        if (Sources.Any(source => StringComparer.OrdinalIgnoreCase.Equals(source.Path, path)))
+        var path = folderPicker.PickFolder("选择当前游戏的 Mods 文件夹", ModsRoot);
+        var normalizedPath = NormalizePathOrNull(path);
+        if (normalizedPath is null)
         {
             return;
         }
 
-        var source = new ScanSourceViewModel(path, enabled);
+        ModsRoot = normalizedPath;
+        var source = Sources.FirstOrDefault(item => PathRulesEqual(item.Path, normalizedPath));
+        if (source is null)
+        {
+            AddSource(normalizedPath, saveSettings: false);
+        }
+        else
+        {
+            source.IsEnabled = true;
+        }
+
+        RefreshAvailability();
+        SaveSettings();
+    }
+
+    private void AddSource(string path, bool enabled = true, bool saveSettings = true)
+    {
+        var normalizedPath = NormalizePathOrNull(path);
+        if (normalizedPath is null
+            || Sources.Any(source => PathRulesEqual(source.Path, normalizedPath)))
+        {
+            return;
+        }
+
+        var source = new ScanSourceViewModel(normalizedPath, enabled);
         source.PropertyChanged += OnSourcePropertyChanged;
         Sources.Add(source);
 
-        if (string.IsNullOrWhiteSpace(ModsRoot)
-            && StringComparer.OrdinalIgnoreCase.Equals(
-                Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
-                "Mods"))
+        if (saveSettings)
         {
-            ModsRoot = path;
-            OnPropertyChanged(nameof(ModsRootDisplay));
+            SaveSettings();
         }
     }
 
@@ -304,21 +367,21 @@ public sealed class MainWindowViewModel : ObservableObject
 
         source.PropertyChanged -= OnSourcePropertyChanged;
         Sources.Remove(source);
+        SaveSettings();
     }
 
     private bool CanStartScan() => !IsBusy && Sources.Any(source => source.IsEnabled);
 
     private async Task StartScanAsync()
     {
+        RefreshAvailability();
         var enabledSources = Sources.Where(source => source.IsEnabled).ToArray();
         if (enabledSources.Length == 0)
         {
             return;
         }
 
-        settingsStore.Save(new DuplicateSettings(
-            ModsRoot,
-            Sources.Select(source => new SavedScanSource(source.Path, source.IsEnabled)).ToArray()));
+        SaveSettings();
 
         var request = new DuplicateScanRequest(
             enabledSources.Select((source, index) => new ScanSource(
@@ -455,19 +518,7 @@ public sealed class MainWindowViewModel : ObservableObject
         RefreshExpansionProperties();
     }
 
-    private async Task DeleteSelectedAsync()
-    {
-        try
-        {
-            await DeleteSelectedCoreAsync();
-        }
-        catch (Exception exception)
-        {
-            IsBusy = false;
-            fileActionDialogs.ShowProblems("删除没有完成", [new FileActionFailure(string.Empty, exception.Message)]);
-            RefreshResultProperties();
-        }
-    }
+    private Task DeleteSelectedAsync() => DeleteSelectedCoreAsync();
 
     private async Task DeleteSelectedCoreAsync()
     {
@@ -522,19 +573,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    private async Task UndoLastDeleteAsync()
-    {
-        try
-        {
-            await UndoLastDeleteCoreAsync();
-        }
-        catch (Exception exception)
-        {
-            IsBusy = false;
-            fileActionDialogs.ShowProblems("撤回没有完成", [new FileActionFailure(string.Empty, exception.Message)]);
-            RefreshResultProperties();
-        }
-    }
+    private Task UndoLastDeleteAsync() => UndoLastDeleteCoreAsync();
 
     private async Task UndoLastDeleteCoreAsync()
     {
@@ -592,7 +631,53 @@ public sealed class MainWindowViewModel : ObservableObject
         if (eventArgs.PropertyName == nameof(ScanSourceViewModel.IsEnabled))
         {
             StartScanCommand.RaiseCanExecuteChanged();
+            SaveSettings();
         }
+    }
+
+    private void RefreshAvailability()
+    {
+        foreach (var source in Sources)
+        {
+            source.RefreshAvailability();
+        }
+
+        IsModsRootAvailable = HasModsRoot && Directory.Exists(ModsRoot!);
+    }
+
+    private void SaveSettings() => settingsStore.Save(new DuplicateSettings(
+        ModsRoot,
+        Sources.Select(source => new SavedScanSource(source.Path, source.IsEnabled)).ToArray()));
+
+    private static string? NormalizePathOrNull(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            var fullPath = Path.GetFullPath(path);
+            var root = Path.GetPathRoot(fullPath);
+            return string.Equals(fullPath, root, StringComparison.OrdinalIgnoreCase)
+                ? fullPath
+                : Path.TrimEndingDirectorySeparator(fullPath);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return null;
+        }
+    }
+
+    private static bool PathRulesEqual(string first, string second) =>
+        StringComparer.OrdinalIgnoreCase.Equals(first, second);
+
+    private void ReportUnexpectedError(string title, Exception exception)
+    {
+        IsBusy = false;
+        unexpectedErrorHandler.Report(title, exception);
+        RefreshResultProperties();
     }
 
     private void OnResultFilePropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
@@ -758,6 +843,7 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         GoHomeCommand.RaiseCanExecuteChanged();
         AddSourceCommand.RaiseCanExecuteChanged();
+        ChangeModsRootCommand.RaiseCanExecuteChanged();
         RemoveSourceCommand.RaiseCanExecuteChanged();
         StartScanCommand.RaiseCanExecuteChanged();
         CancelScanCommand.RaiseCanExecuteChanged();

@@ -7,7 +7,14 @@ public sealed record SavedScanSource(string Path, bool Enabled);
 
 public sealed record DuplicateSettings(string? ModsRoot, IReadOnlyList<SavedScanSource> Sources);
 
-public sealed class DuplicateSettingsStore
+public interface IDuplicateSettingsStore
+{
+    DuplicateSettings? Load();
+
+    void Save(DuplicateSettings settings);
+}
+
+public sealed class DuplicateSettingsStore : IDuplicateSettingsStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 

@@ -173,12 +173,34 @@
 
                         <Border Grid.Row="1" Margin="0,16,0,12" Background="#EAE7E2" CornerRadius="4" Padding="12">
                             <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <TextBlock Text="当前 Mods 文件夹" Style="{StaticResource SectionTitleTextStyle}" FontSize="12" />
-                                <TextBlock Grid.Row="1" Margin="0,5,0,0" Text="{Binding ModsRootDisplay}" TextTrimming="CharacterEllipsis" ToolTip="{Binding ModsRootDisplay}" Foreground="{StaticResource MutedBrush}" Style="{StaticResource DataTextStyle}" FontSize="11" />
+                                <Button Grid.Column="1"
+                                        Grid.RowSpan="2"
+                                        Content="{Binding ModsRootActionText}"
+                                        Command="{Binding ChangeModsRootCommand}"
+                                        Style="{StaticResource HeaderBackButtonStyle}"
+                                        Padding="6,2"
+                                        Foreground="#A892C5"
+                                        FontSize="12"
+                                        FontWeight="Normal"
+                                        VerticalAlignment="Center" />
+                                <TextBlock Grid.Row="1" Margin="0,5,10,0" Text="{Binding ModsRootDisplay}" TextTrimming="CharacterEllipsis" ToolTip="{Binding ModsRootDisplay}" Foreground="{StaticResource MutedBrush}" Style="{StaticResource DataTextStyle}" FontSize="11" />
+                                <TextBlock Grid.Row="2"
+                                           Margin="0,5,0,0"
+                                           Text="不可访问"
+                                           Foreground="#9A6A32"
+                                           Style="{StaticResource DataTextStyle}"
+                                           FontSize="10"
+                                           Visibility="{Binding HasModsRootAvailabilityWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             </Grid>
                         </Border>
 
@@ -197,7 +219,15 @@
                                                           IsEnabled="{Binding DataContext.CanEditSources, RelativeSource={RelativeSource AncestorType=Window}}"
                                                           Margin="0,0,10,0" />
                                                 <StackPanel Grid.Column="1">
-                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource SectionTitleTextStyle}" TextTrimming="CharacterEllipsis" />
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Name}" Style="{StaticResource SectionTitleTextStyle}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Margin="8,1,0,0"
+                                                                   Text="{Binding AvailabilityText}"
+                                                                   Foreground="#9A6A32"
+                                                                   Style="{StaticResource DataTextStyle}"
+                                                                   FontSize="10"
+                                                                   Visibility="{Binding HasAvailabilityWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                    </StackPanel>
                                                     <TextBlock Text="{Binding Path}" Foreground="{StaticResource MutedBrush}" Style="{StaticResource DataTextStyle}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}" />
                                                 </StackPanel>
                                                 <Button Grid.Column="2"
