@@ -135,6 +135,47 @@ public sealed class MainWindowViewModelTests
     }
 
     [TestMethod]
+    public async Task CancelledRunUpdatesStatusWithoutReportingAnUnexpectedError()
+    {
+        using var temporary = new TemporaryDirectory();
+        var source = temporary.CreateDirectory("source");
+        var settings = new FakeSettingsStore(new DuplicateSettings(
+            null,
+            [new SavedScanSource(source, true)]));
+        var errors = new FakeUnexpectedErrorHandler();
+        var runService = new FakeDuplicateRunService((_, _, _) =>
+            Task.FromCanceled<DuplicateReport>(new CancellationToken(canceled: true)));
+        var viewModel = CreateViewModel(settings, runService: runService, errorHandler: errors);
+
+        await viewModel.StartScanCommand.ExecuteAsync();
+
+        Assert.AreEqual("扫描已取消", viewModel.StatusText);
+        Assert.IsFalse(viewModel.IsBusy);
+        Assert.AreEqual(0, errors.Errors.Count);
+    }
+
+    [TestMethod]
+    public async Task UnexpectedRunFailureUsesTheInjectedErrorHandler()
+    {
+        using var temporary = new TemporaryDirectory();
+        var source = temporary.CreateDirectory("source");
+        var settings = new FakeSettingsStore(new DuplicateSettings(
+            null,
+            [new SavedScanSource(source, true)]));
+        var errors = new FakeUnexpectedErrorHandler();
+        var expected = new InvalidOperationException("unexpected");
+        var runService = new FakeDuplicateRunService((_, _, _) => Task.FromException<DuplicateReport>(expected));
+        var viewModel = CreateViewModel(settings, runService: runService, errorHandler: errors);
+
+        await viewModel.StartScanCommand.ExecuteAsync();
+
+        Assert.IsFalse(viewModel.IsBusy);
+        Assert.AreEqual(1, errors.Errors.Count);
+        Assert.AreEqual("扫描没有完成", errors.Errors[0].Title);
+        Assert.AreSame(expected, errors.Errors[0].Exception);
+    }
+
+    [TestMethod]
     public async Task AsyncRelayCommandReportsFailuresAndAlwaysBecomesExecutableAgain()
     {
         var failures = new List<Exception>();
@@ -185,11 +226,13 @@ public sealed class MainWindowViewModelTests
 
     private static MainWindowViewModel CreateViewModel(
         FakeSettingsStore settings,
-        FakeFolderPicker? picker = null) => new(
-        DuplicateScanner.CreateDefault(),
+        FakeFolderPicker? picker = null,
+        IDuplicateRunService? runService = null,
+        FakeUnexpectedErrorHandler? errorHandler = null) => new(
+        runService ?? new DuplicateRunService(DuplicateScanner.CreateDefault()),
         picker ?? new FakeFolderPicker(),
         settings,
-        unexpectedErrorHandler: new FakeUnexpectedErrorHandler());
+        unexpectedErrorHandler: errorHandler ?? new FakeUnexpectedErrorHandler());
 
     private static bool PathsEqual(string first, string second) =>
         StringComparer.OrdinalIgnoreCase.Equals(first, second);
@@ -217,10 +260,23 @@ public sealed class MainWindowViewModelTests
             paths.Count == 0 ? null : paths.Dequeue();
     }
 
+    private sealed class FakeDuplicateRunService(
+        Func<DuplicateRunInput, IProgress<DuplicateScanProgress>?, CancellationToken, Task<DuplicateReport>> run)
+        : IDuplicateRunService
+    {
+        public Task<DuplicateReport> RunAsync(
+            DuplicateRunInput input,
+            IProgress<DuplicateScanProgress>? progress = null,
+            CancellationToken cancellationToken = default) => run(input, progress, cancellationToken);
+    }
+
     private sealed class FakeUnexpectedErrorHandler : IUnexpectedErrorHandler
     {
+        public List<(string Title, Exception Exception)> Errors { get; } = [];
+
         public void Report(string title, Exception exception)
         {
+            Errors.Add((title, exception));
         }
     }
 

@@ -10,20 +10,17 @@ namespace Sims4ModDoctor.Desktop.ViewModels;
 
 public sealed class MainWindowViewModel : ObservableObject
 {
-    private readonly DuplicateScanner scanner;
+    private readonly IDuplicateRunService duplicateRunService;
+    private readonly DuplicateResultSession resultSession;
     private readonly IFolderPickerService folderPicker;
     private readonly IDuplicateSettingsStore settingsStore;
     private readonly IFileActionService fileActionService;
     private readonly IFileActionDialogService fileActionDialogs;
     private readonly IUnexpectedErrorHandler unexpectedErrorHandler;
-    private readonly DuplicateSelectionService selectionService = new();
     private CancellationTokenSource? scanCancellation;
-    private IReadOnlyList<DuplicateGroupViewModel> groups = Array.Empty<DuplicateGroupViewModel>();
     private IReadOnlyList<DuplicateGroup>? lastDeleteSnapshot;
     private int resultGeneration;
     private int lastDeleteResultGeneration;
-    private bool isBulkUpdatingSelection;
-    private bool isBulkUpdatingExpansion;
     private bool isHomeVisible = true;
     private bool isScannerVisible;
     private bool isBusy;
@@ -40,19 +37,22 @@ public sealed class MainWindowViewModel : ObservableObject
     private string fileActionStatusText = string.Empty;
 
     public MainWindowViewModel(
-        DuplicateScanner scanner,
+        IDuplicateRunService duplicateRunService,
         IFolderPickerService folderPicker,
         IDuplicateSettingsStore settingsStore,
         IFileActionService? fileActionService = null,
         IFileActionDialogService? fileActionDialogs = null,
-        IUnexpectedErrorHandler? unexpectedErrorHandler = null)
+        IUnexpectedErrorHandler? unexpectedErrorHandler = null,
+        DuplicateResultSession? resultSession = null)
     {
-        this.scanner = scanner;
+        this.duplicateRunService = duplicateRunService;
+        this.resultSession = resultSession ?? new DuplicateResultSession();
         this.folderPicker = folderPicker;
         this.settingsStore = settingsStore;
         this.fileActionService = fileActionService ?? new FileActionService();
         this.fileActionDialogs = fileActionDialogs ?? new FileActionDialogService();
         this.unexpectedErrorHandler = unexpectedErrorHandler ?? new UnexpectedErrorHandler();
+        this.resultSession.PropertyChanged += OnResultSessionPropertyChanged;
 
         Sources.CollectionChanged += OnSourcesChanged;
         OpenDuplicateScannerCommand = new RelayCommand(_ => ShowScanner());
@@ -82,11 +82,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public ObservableCollection<ScanSourceViewModel> Sources { get; } = [];
 
-    public IReadOnlyList<DuplicateGroupViewModel> Groups
-    {
-        get => groups;
-        private set => SetProperty(ref groups, value);
-    }
+    public IReadOnlyList<DuplicateGroupViewModel> Groups => resultSession.Groups;
 
     public RelayCommand OpenDuplicateScannerCommand { get; }
 
@@ -221,31 +217,27 @@ public sealed class MainWindowViewModel : ObservableObject
         private set => SetProperty(ref issueCount, value);
     }
 
-    public bool HasResults => Groups.Count > 0;
+    public bool HasResults => resultSession.HasResults;
 
     public bool CanEditSources => !IsBusy;
 
-    public bool HasNoResults => !HasResults;
+    public bool HasNoResults => resultSession.HasNoResults;
 
-    public int DuplicateGroupCount => Groups.Count;
+    public int DuplicateGroupCount => resultSession.DuplicateGroupCount;
 
-    public int DuplicateFileCount => Groups.Sum(group => group.Files.Count);
+    public int DuplicateFileCount => resultSession.DuplicateFileCount;
 
-    public int SelectedFileCount => Groups.Sum(group => group.SelectedCount);
+    public int SelectedFileCount => resultSession.SelectedFileCount;
 
-    public string DuplicateSizeText => DuplicateGroupViewModel.FormatBytes(
-        Groups.Sum(group => checked(group.Model.FileSize * group.Files.Count)));
+    public string DuplicateSizeText => resultSession.DuplicateSizeText;
 
-    public string SelectedSizeText => DuplicateGroupViewModel.FormatBytes(
-        Groups.Sum(group => group.SelectedBytes));
+    public string SelectedSizeText => resultSession.SelectedSizeText;
 
-    public bool ShowExpandAllIcon => Groups.Count == 0 || !Groups.All(group => group.IsExpanded);
+    public bool ShowExpandAllIcon => resultSession.ShowExpandAllIcon;
 
-    public bool ShowCollapseAllIcon => Groups.Count > 0 && Groups.All(group => group.IsExpanded);
+    public bool ShowCollapseAllIcon => resultSession.ShowCollapseAllIcon;
 
-    public string ExpandCollapseToolTip => Groups.Count > 0 && Groups.All(group => group.IsExpanded)
-        ? "收起全部"
-        : "展开全部";
+    public string ExpandCollapseToolTip => resultSession.ExpandCollapseToolTip;
 
     public string FileActionStatusText
     {
@@ -383,14 +375,11 @@ public sealed class MainWindowViewModel : ObservableObject
 
         SaveSettings();
 
-        var request = new DuplicateScanRequest(
-            enabledSources.Select((source, index) => new ScanSource(
-                $"目录 {index + 1}",
-                source.Path,
-                Order: index,
-                Label: source.Name)).ToArray(),
-            ModsRoot,
-            [".package", ".ts4script"]);
+        var input = new DuplicateRunInput(
+            enabledSources
+                .Select(source => new DuplicateRunSource(source.Path, source.Name))
+                .ToArray(),
+            ModsRoot);
 
         ResetResultSession();
         scanCancellation = new CancellationTokenSource();
@@ -405,15 +394,15 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             var report = await Task.Run(
-                () => scanner.ScanAsync(request, progress, scanCancellation.Token),
+                () => duplicateRunService.RunAsync(input, progress, scanCancellation.Token),
                 scanCancellation.Token);
 
             StatusText = "正在整理结果…";
             IsProgressIndeterminate = true;
             var resultGroups = await Task.Run(
-                () => BuildGroupViewModels(report.Groups, scanCancellation.Token),
+                () => resultSession.PrepareGroups(report.Groups, scanCancellation.Token),
                 scanCancellation.Token);
-            SetGroups(resultGroups);
+            resultSession.Replace(resultGroups);
 
             IssueCount = report.Issues.Count;
             DiscoveredFileCount = report.DiscoveredFileCount;
@@ -463,60 +452,11 @@ public sealed class MainWindowViewModel : ObservableObject
         };
     }
 
-    private void ApplySuggestions()
-    {
-        isBulkUpdatingSelection = true;
-        try
-        {
-            foreach (var group in Groups)
-            {
-                group.ApplySuggestion();
-            }
-        }
-        finally
-        {
-            isBulkUpdatingSelection = false;
-        }
+    private void ApplySuggestions() => resultSession.ApplySuggestions();
 
-        RefreshResultProperties();
-    }
+    private void ClearSelection() => resultSession.ClearSelection();
 
-    private void ClearSelection()
-    {
-        isBulkUpdatingSelection = true;
-        try
-        {
-            foreach (var group in Groups)
-            {
-                group.ClearSelection();
-            }
-        }
-        finally
-        {
-            isBulkUpdatingSelection = false;
-        }
-
-        RefreshResultProperties();
-    }
-
-    private void ToggleAllGroups()
-    {
-        var expand = !Groups.All(group => group.IsExpanded);
-        isBulkUpdatingExpansion = true;
-        try
-        {
-            foreach (var group in Groups)
-            {
-                group.IsExpanded = expand;
-            }
-        }
-        finally
-        {
-            isBulkUpdatingExpansion = false;
-        }
-
-        RefreshExpansionProperties();
-    }
+    private void ToggleAllGroups() => resultSession.ToggleAllGroups();
 
     private Task DeleteSelectedAsync() => DeleteSelectedCoreAsync();
 
@@ -557,7 +497,9 @@ public sealed class MainWindowViewModel : ObservableObject
             {
                 lastDeleteSnapshot = snapshot;
                 lastDeleteResultGeneration = resultGeneration;
-                RebuildGroups(snapshot, result.CompletedPaths.ToHashSet(StringComparer.OrdinalIgnoreCase));
+                resultSession.RemoveCompletedPaths(
+                    snapshot,
+                    result.CompletedPaths.ToHashSet(StringComparer.OrdinalIgnoreCase));
                 FileActionStatusText = $"已移入回收站 {result.CompletedPaths.Count} 个文件";
             }
 
@@ -590,7 +532,7 @@ public sealed class MainWindowViewModel : ObservableObject
             {
                 if (lastDeleteSnapshot is not null && lastDeleteResultGeneration == resultGeneration)
                 {
-                    RebuildGroupsFromExistingFiles(lastDeleteSnapshot);
+                    resultSession.RestoreExistingPaths(lastDeleteSnapshot);
                 }
 
                 FileActionStatusText = result.Failures.Count == 0
@@ -680,121 +622,25 @@ public sealed class MainWindowViewModel : ObservableObject
         RefreshResultProperties();
     }
 
-    private void OnResultFilePropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
+    private void OnResultSessionPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
     {
-        if (eventArgs.PropertyName == nameof(DuplicateFileViewModel.IsSelected))
+        if (string.IsNullOrWhiteSpace(eventArgs.PropertyName))
         {
-            if (isBulkUpdatingSelection)
-            {
-                return;
-            }
-
-            OnPropertyChanged(nameof(SelectedFileCount));
-            OnPropertyChanged(nameof(SelectedSizeText));
-            ClearSelectionCommand.RaiseCanExecuteChanged();
-            DeleteSelectedCommand.RaiseCanExecuteChanged();
+            OnPropertyChanged(null);
         }
-    }
-
-    private void OnResultGroupPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
-    {
-        if (eventArgs.PropertyName == nameof(DuplicateGroupViewModel.IsExpanded))
+        else
         {
-            if (isBulkUpdatingExpansion)
-            {
-                return;
-            }
-
-            RefreshExpansionProperties();
-        }
-    }
-
-    private static IReadOnlyList<DuplicateGroupViewModel> BuildGroupViewModels(
-        IReadOnlyList<DuplicateGroup> reportGroups,
-        CancellationToken cancellationToken)
-    {
-        var result = new DuplicateGroupViewModel[reportGroups.Count];
-        for (var index = 0; index < reportGroups.Count; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            result[index] = new DuplicateGroupViewModel(reportGroups[index], index + 1);
+            OnPropertyChanged(eventArgs.PropertyName);
         }
 
-        return result;
-    }
-
-    private void SetGroups(IReadOnlyList<DuplicateGroupViewModel> value)
-    {
-        foreach (var group in Groups)
-        {
-            group.PropertyChanged -= OnResultGroupPropertyChanged;
-            foreach (var file in group.Files)
-            {
-                file.PropertyChanged -= OnResultFilePropertyChanged;
-            }
-        }
-
-        foreach (var group in value)
-        {
-            group.PropertyChanged += OnResultGroupPropertyChanged;
-            foreach (var file in group.Files)
-            {
-                file.PropertyChanged += OnResultFilePropertyChanged;
-            }
-        }
-
-        Groups = value;
-        RefreshResultProperties();
-    }
-
-    private void RebuildGroups(
-        IReadOnlyList<DuplicateGroup> snapshot,
-        IReadOnlySet<string> excludedPaths)
-    {
-        var models = snapshot
-            .Select(group => RebuildGroup(
-                group,
-                group.Files.Where(file => !excludedPaths.Contains(file.Path)).ToArray()))
-            .Where(group => group is not null)
-            .Cast<DuplicateGroup>()
-            .ToArray();
-        SetGroups(BuildGroupViewModels(models, CancellationToken.None));
-    }
-
-    private void RebuildGroupsFromExistingFiles(IReadOnlyList<DuplicateGroup> snapshot)
-    {
-        var models = snapshot
-            .Select(group => RebuildGroup(
-                group,
-                group.Files.Where(file => File.Exists(file.Path)).ToArray()))
-            .Where(group => group is not null)
-            .Cast<DuplicateGroup>()
-            .ToArray();
-        SetGroups(BuildGroupViewModels(models, CancellationToken.None));
-    }
-
-    private DuplicateGroup? RebuildGroup(DuplicateGroup source, IReadOnlyList<DuplicateFile> remainingFiles)
-    {
-        if (remainingFiles.Count < 2)
-        {
-            return null;
-        }
-
-        var selection = selectionService.Select(remainingFiles.ToArray());
-        return new DuplicateGroup(
-            source.Sha256,
-            source.FileSize,
-            source.Section,
-            remainingFiles,
-            selection.KeepPath,
-            selection.DeletePaths);
+        RefreshResultCommands();
     }
 
     private void ResetResultSession()
     {
         resultGeneration++;
         ClearFileActionHistory();
-        SetGroups(Array.Empty<DuplicateGroupViewModel>());
+        resultSession.Reset();
         IssueCount = 0;
         DiscoveredFileCount = 0;
         ProgressValue = 0;
@@ -816,27 +662,17 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private void RefreshResultProperties()
     {
-        OnPropertyChanged(nameof(HasResults));
-        OnPropertyChanged(nameof(HasNoResults));
-        OnPropertyChanged(nameof(DuplicateGroupCount));
-        OnPropertyChanged(nameof(DuplicateFileCount));
-        OnPropertyChanged(nameof(SelectedFileCount));
-        OnPropertyChanged(nameof(DuplicateSizeText));
-        OnPropertyChanged(nameof(SelectedSizeText));
         OnPropertyChanged(nameof(CanUndoLastDelete));
-        RefreshExpansionProperties();
+        RefreshResultCommands();
+    }
+
+    private void RefreshResultCommands()
+    {
         ApplySuggestionsCommand.RaiseCanExecuteChanged();
         ClearSelectionCommand.RaiseCanExecuteChanged();
         ToggleAllGroupsCommand.RaiseCanExecuteChanged();
         DeleteSelectedCommand.RaiseCanExecuteChanged();
         UndoLastDeleteCommand.RaiseCanExecuteChanged();
-    }
-
-    private void RefreshExpansionProperties()
-    {
-        OnPropertyChanged(nameof(ShowExpandAllIcon));
-        OnPropertyChanged(nameof(ShowCollapseAllIcon));
-        OnPropertyChanged(nameof(ExpandCollapseToolTip));
     }
 
     private void RefreshCommands()
@@ -847,10 +683,6 @@ public sealed class MainWindowViewModel : ObservableObject
         RemoveSourceCommand.RaiseCanExecuteChanged();
         StartScanCommand.RaiseCanExecuteChanged();
         CancelScanCommand.RaiseCanExecuteChanged();
-        ApplySuggestionsCommand.RaiseCanExecuteChanged();
-        ClearSelectionCommand.RaiseCanExecuteChanged();
-        ToggleAllGroupsCommand.RaiseCanExecuteChanged();
-        DeleteSelectedCommand.RaiseCanExecuteChanged();
-        UndoLastDeleteCommand.RaiseCanExecuteChanged();
+        RefreshResultCommands();
     }
 }

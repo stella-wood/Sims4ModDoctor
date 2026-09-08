@@ -11,7 +11,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = new MainWindowViewModel(
-            DuplicateScanner.CreateDefault(),
+            new DuplicateRunService(DuplicateScanner.CreateDefault()),
             new FolderPickerService(),
             new DuplicateSettingsStore());
     }
