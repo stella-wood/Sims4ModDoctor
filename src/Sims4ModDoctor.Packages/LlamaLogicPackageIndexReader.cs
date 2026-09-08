@@ -141,10 +141,9 @@ public sealed class LlamaLogicPackageIndexReader(
     /// 取资源内容大小。
     /// </summary>
     /// <remarks>
-    /// ⚠️ 这一项不是纯索引数据：库为了回答尺寸，需要按资源类型触碰内容，
-    /// 对结构合法但内容不完整的文件会直接抛异常。本轮只读索引，
-    /// 因此这里把它降级为尽力而为——取不到就记 <see langword="null"/>，
-    /// 不让一条元数据毁掉整个文件的 TGI 索引。
+    /// 库在这里只从已解析的索引项取一个数字，不读取也不解压资源内容。
+    /// try/catch 是兜底而非常态：某些索引取值会让库直接抛异常，
+    /// 那时记 <see langword="null"/>，不让一条元数据毁掉整个文件的 TGI 索引。
     /// </remarks>
     private static long? ReadContentSize(DataBasePackedFile package, LlamaResourceKey key)
     {
@@ -159,9 +158,13 @@ public sealed class LlamaLogicPackageIndexReader(
     }
 
     /// <summary>
-    /// 取压缩模式。与尺寸同理，取不到时归入
-    /// <see cref="PackageCompression.Unknown"/> 而不是让整份索引失败。
+    /// 取压缩模式。同样只读索引项里的压缩类型字段。
     /// </summary>
+    /// <remarks>
+    /// 库把该字段映射成自己的枚举，映射不上时抛
+    /// <see cref="NotSupportedException"/>。那种情况归入
+    /// <see cref="PackageCompression.Unknown"/>，而不是让整份索引失败。
+    /// </remarks>
     private static (PackageCompression Compression, string Raw) ReadCompression(
         DataBasePackedFile package,
         LlamaResourceKey key)

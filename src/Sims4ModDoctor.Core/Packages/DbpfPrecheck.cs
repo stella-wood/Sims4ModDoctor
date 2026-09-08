@@ -222,7 +222,7 @@ public static class DbpfPrecheck
                 PackageReadStage.Precheck,
                 path,
                 "这个 package 的索引使用了本工具不认识的布局。",
-                $"indexType 位域 0x{indexType:X8} 含已知 8 位之外的置位。");
+                $"indexType 位域 0x{indexType:X8} 含三个受支持位（0x01/0x02/0x04）之外的置位。");
         }
 
         // 索引头 = 位域本身 + 每个置位对应的一个公共常量 DWORD；

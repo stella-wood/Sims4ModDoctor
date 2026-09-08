@@ -33,9 +33,10 @@ public enum PackageCompression
 /// </summary>
 /// <param name="ContentSize">
 /// 第三方库报告的资源内容大小；<see langword="null"/> 表示这一项取不到。
-/// ⚠️ 取这个值需要库触碰资源内容，不是纯索引操作，因此允许缺失：
-/// 一条元数据拿不到，不应让整个 package 的索引读取失败。
-/// 该值尚未与 s4pe 的 memory size 逐项对拍。
+/// 它取自索引项里已解析的字段，不读取也不解压资源内容。
+/// 允许缺失只是兜底：库对某些取值会抛异常（例如压缩类型不在它的枚举内），
+/// 一条元数据拿不到不应让整个 package 的索引读取失败。
+/// ⚠️ 该值尚未与 s4pe 的 memory size 逐项对拍。
 /// </param>
 /// <param name="CompressionRaw">
 /// 第三方库给出的压缩模式原文。<see cref="Compression"/> 是它的规范化映射，
