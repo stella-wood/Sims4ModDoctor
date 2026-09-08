@@ -1,5 +1,7 @@
 # Sims 4 Mod Doctor
 
+[![CI](https://github.com/stella-wood/Sims4ModDoctor/actions/workflows/ci.yml/badge.svg)](https://github.com/stella-wood/Sims4ModDoctor/actions/workflows/ci.yml)
+
 Sims 4 Mod Doctor 是一个面向 Windows 的本地离线《模拟人生 4》Mod 整理工具。
 
 当前版本专注于可靠地发现并处理内容完全相同的重复文件。扫描和报告生成默认只读；只有用户明确勾选并确认后，桌面版才会把文件移入 Windows 回收站。
@@ -29,6 +31,8 @@ Mod 冲突检测入口目前尚未开放，当前版本不会分析 DBPF 资源�
 仓库的 `global.json` 固定了开发所使用的 SDK 版本。`eng\dotnet.cmd` 会优先使用项目内的本地 SDK；本地 SDK 不存在时会自动使用系统 `dotnet`。
 
 ## 构建与测试
+
+每次推送到 `main` 或提交 Pull Request 时，GitHub Actions 都会在 Windows 上执行锁定还原、Release 构建和普通测试。
 
 ```powershell
 .\eng\dotnet.cmd restore .\Sims4ModDoctor.sln --locked-mode
