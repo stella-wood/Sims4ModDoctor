@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="MSTest" Version="4.3.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Sims4ModDoctor.Packages\Sims4ModDoctor.Packages.csproj" />
+  </ItemGroup>
+
+  <!--
+    fixture 构造器与临时目录工具与 Core 测试共用同一份源码，避免两处各写一份、
+    各自漂移。链接而非复制，改一处即可。
+  -->
+  <ItemGroup>
+    <Compile Include="..\Sims4ModDoctor.Core.Tests\Packages\DbpfFixtureBuilder.cs"
+             Link="Shared\DbpfFixtureBuilder.cs" />
+    <Compile Include="..\Sims4ModDoctor.Core.Tests\TempDirectory.cs"
+             Link="Shared\TempDirectory.cs" />
+  </ItemGroup>
+
+</Project>

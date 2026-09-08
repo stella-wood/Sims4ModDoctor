@@ -25,6 +25,14 @@ internal sealed class TempDirectory : IDisposable
         return System.IO.Path.GetFullPath(path);
     }
 
+    public string WriteBytes(string relativePath, byte[] content)
+    {
+        var path = System.IO.Path.Combine(Path, relativePath);
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+        File.WriteAllBytes(path, content);
+        return System.IO.Path.GetFullPath(path);
+    }
+
     public void Dispose()
     {
         try
