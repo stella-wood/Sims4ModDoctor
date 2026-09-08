@@ -138,5 +138,6 @@ public static class PackageReadIssueCode
     public const string ResourceCountExceedsLimit = "package-resource-count-exceeds-limit";
 
     public const string IndexReadFailed = "package-index-read-failed";
+    public const string DuplicateResourceKeys = "package-duplicate-resource-keys";
     public const string ChangedDuringRead = "package-changed-during-read";
 }

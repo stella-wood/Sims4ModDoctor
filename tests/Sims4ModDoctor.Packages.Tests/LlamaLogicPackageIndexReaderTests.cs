@@ -17,9 +17,9 @@ public sealed class LlamaLogicPackageIndexReaderTests
     {
         using var temp = new TempDirectory();
         var path = temp.WriteBytes("角色.package", new DbpfFixtureBuilder()
-            .AddResource(type: 0x034AEECB, group: 0x0000000A, instanceLo: 0xAAAA0001, compressed: 0)
-            .AddResource(type: 0x034AEECB, group: 0x0000000A, instanceLo: 0xAAAA0002, compressed: 0)
-            .AddResource(type: 0x00B2D882, group: 0x00000000, instanceLo: 0xBBBB0001, compressed: 0)
+            .AddResource(type: 0x034AEECB, group: 0x0000000A, instanceLo: 0xAAAA0001)
+            .AddResource(type: 0x034AEECB, group: 0x0000000A, instanceLo: 0xAAAA0002)
+            .AddResource(type: 0x00B2D882, group: 0x00000000, instanceLo: 0xBBBB0001)
             .Build());
 
         var result = await LlamaLogicPackageIndexReader.CreateDefault().ReadIndexAsync(path);
@@ -40,7 +40,7 @@ public sealed class LlamaLogicPackageIndexReaderTests
     {
         using var temp = new TempDirectory();
         var path = temp.WriteBytes("资源.package", new DbpfFixtureBuilder()
-            .AddResource(compressed: 0)
+            .AddResource()
             .Build());
 
         var result = await LlamaLogicPackageIndexReader.CreateDefault().ReadIndexAsync(path);
@@ -120,6 +120,34 @@ public sealed class LlamaLogicPackageIndexReaderTests
         Assert.IsFalse(results[2].IsSuccess);
         Assert.IsTrue(results[3].IsSuccess, "一个坏文件不应影响它后面的文件。");
         Assert.AreEqual(PackageReadIssueCode.MagicMismatch, results[2].Issue?.Code);
+    }
+
+    // 第三方库用有序 HashSet 与以 ResourceKey 为键的字典存索引，重复 TGI 会被折叠。
+    // 一个专门用来找重复资源的工具，绝不能在地基上把重复吃掉还报成功。
+    [TestMethod]
+    public async Task RefusesAPackageWhoseDuplicateKeysWouldBeSilentlyCollapsed()
+    {
+        using var temp = new TempDirectory();
+        var path = temp.WriteBytes("重复键.package", new DbpfFixtureBuilder()
+            .AddResource(type: 0x0904DF10, group: 0x0000000A, instanceLo: 0xAAAA0001)
+            .AddResource(type: 0x0904DF10, group: 0x0000000A, instanceLo: 0xAAAA0001)
+            .AddResource(type: 0x545AC67A, group: 0x0000000A, instanceLo: 0xBBBB0001)
+            .Build());
+
+        var result = await LlamaLogicPackageIndexReader.CreateDefault().ReadIndexAsync(path);
+
+        Assert.IsFalse(result.IsSuccess, "重复的资源键被静默折叠了。");
+        Assert.AreEqual(PackageReadIssueCode.DuplicateResourceKeys, result.Issue?.Code);
+        Assert.IsNull(result.Summary);
+    }
+
+    [TestMethod]
+    public async Task ReturnsAStructuredFailureForAnEmptyPath()
+    {
+        var result = await LlamaLogicPackageIndexReader.CreateDefault().ReadIndexAsync("   ");
+
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(PackageReadIssueCode.PathInvalid, result.Issue?.Code);
     }
 
     [TestMethod]

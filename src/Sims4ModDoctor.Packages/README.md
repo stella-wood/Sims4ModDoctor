@@ -25,13 +25,32 @@
 | `package-too-large` | 超出配置的体积上限 |
 | `package-magic-mismatch` | 开头不是 `DBPF` |
 | `package-unsupported-version` | 不是 2.1（Sims 2 的 1.1 也在此拦下） |
-| `package-unsupported-index-version` | 索引版本不是 3，或位域用了已知 8 位之外的位 |
+| `package-unsupported-index-version` | 索引版本不是 3，或位域用了三个受支持位之外的位 |
 | `package-resource-count-exceeds-limit` | 声明的资源数超过上限 |
 | `package-index-out-of-bounds` | 索引位置越界、与文件长度矛盾、或 32 位相加回绕 |
-| `package-index-size-mismatch` | 索引长度与「资源数 × 每条实际字段数」对不上 |
+| `package-index-size-mismatch` | 索引长度不在「资源数 × 每条可能长度」的区间内 |
+| `package-duplicate-resource-keys` | 索引里有重复的资源键（见下） |
 
-最后一条依赖 indexType 位域：位域每置一位，对应字段就从每条记录里提出来，
-只在索引头里存一次。**不能假设每条记录固定 32 字节。**
+后两条依赖索引的真实布局，有两处不能想当然：
+
+**一、indexType 位域只有三位有效**（`0x01` Type、`0x02` Group、`0x04` Instance 高位）。
+置位的字段从每条记录里提出来，只在索引头里存一次。
+社区文档描述了 8 个位，但依赖的第三方库只实现这三个——其余位置位时它会忽略 flag
+并按错误布局逐条读取，读出一堆看起来正常的假资源键，所以预检直接拒绝。
+
+**二、每条记录的长度本身是可变的。** 固定 7 个 DWORD，
+外加**可选**的 4 字节扩展压缩信息（Size 字段最高位是它的标志）。
+因此索引长度只能校验区间，不能校验相等。
+
+⚠️ 一批真实样本里恰好全部带扩展字段，不等于它必须带。
+
+### 重复资源键会被拒绝
+
+第三方库用有序 HashSet 与以资源键为键的字典存索引，同一个 TGI 出现两次就只剩一条。
+本实现在读取后比对键数量与 header 声明的条目数，不一致时整份作废。
+
+一个专门用来找重复资源的工具，不能在地基上把重复吃掉还报成功。
+⚠️ 这是「暂时不支持」，不是「这个文件坏了」——将来若要支持，需要绕开该库的索引集合。
 
 ## 现在不支持什么
 
@@ -61,7 +80,9 @@
 自动测试（`tests/Sims4ModDoctor.Packages.Tests`、
 `tests/Sims4ModDoctor.Core.Tests/Packages`）覆盖：
 
-- indexType 位域从 `0x00` 到 `0xFF` 的每一种已知布局；
+- indexType 位域三个有效位的每一种组合，以及无效位必须被拒绝；
+- 每条带 / 每条不带 / 混着带扩展压缩字段；
+- 索引位置写在 64 位字段或老式 32 位字段；重复资源键；空路径；
 - 太小、magic 错、版本不符、索引越界、整数回绕、截断索引、
   伪造的巨大资源数、空索引自相矛盾；
 - 取消传播、读取中途文件改动、批量中的单点失败；

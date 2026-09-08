@@ -23,11 +23,32 @@ public static class DbpfPrecheck
     /// <summary>索引开头的 indexType 位域本身占一个 DWORD。</summary>
     public const int IndexTypeFieldLength = 4;
 
-    /// <summary>一条逻辑索引记录固定 8 个 DWORD，其中被声明为公共常量的字段不再逐条存储。</summary>
-    public const int IndexFieldsPerEntry = 8;
+    /// <summary>
+    /// 一条索引记录固定的 DWORD 数：Type、Group、InstanceHi、InstanceLo、
+    /// Chunkoffset、Size、Memsize。被声明为公共常量的字段不再逐条存储。
+    /// </summary>
+    public const int IndexFieldsPerEntry = 7;
 
-    /// <summary>已知 indexType 位域只使用低 8 位，每一位对应一个可提取为公共常量的字段。</summary>
-    public const uint KnownIndexTypeMask = 0xFF;
+    /// <summary>
+    /// Size 字段的最高位（社区文档标作 Unknown1，第三方库内叫
+    /// <c>mbExtendedCompressionType</c>）。置位时该条记录尾部还有 4 字节扩展压缩信息。
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ 它是**可选**的，逐条独立。一批样本里恰好全部置位，不等于它必须置位——
+    /// 因此索引长度只能校验区间，不能校验相等。
+    /// </remarks>
+    public const int ExtendedCompressionFieldLength = 4;
+
+    /// <summary>
+    /// indexType 位域只有三位有效：0x01 Type、0x02 Group、0x04 Instance 高 32 位。
+    /// Instance 低 32 位没有常量选项，永远逐条存储。
+    /// </summary>
+    /// <remarks>
+    /// 社区文档描述了 8 个位。本工具依赖的第三方库只实现这三个，
+    /// 其余位置位时它会忽略 flag 并按错误的布局逐条读取——放行这种文件
+    /// 等于放行一堆看起来正常的假资源键，所以在预检就拒绝。
+    /// </remarks>
+    public const uint KnownIndexTypeMask = 0x07;
 
     private const uint Magic = 0x46504244; // "DBPF"，小端
 
@@ -44,8 +65,14 @@ public static class DbpfPrecheck
     private const int OffsetMajor = 0x04;
     private const int OffsetMinor = 0x08;
     private const int OffsetEntryCount = 0x24;
+
+    /// <summary>老式的 32 位索引位置。仅在 64 位字段为 0 时使用。</summary>
+    private const int OffsetLegacyIndexPosition = 0x28;
+
     private const int OffsetIndexSize = 0x2C;
     private const int OffsetIndexVersion = 0x3C;
+
+    /// <summary>64 位索引位置。非 0 时优先于老式字段。</summary>
     private const int OffsetIndexPosition = 0x40;
 
     /// <summary>
@@ -58,7 +85,7 @@ public static class DbpfPrecheck
         uint EntryCount,
         uint IndexSize,
         uint IndexVersion,
-        uint IndexPosition);
+        ulong IndexPosition);
 
     /// <summary>
     /// 校验 header。<paramref name="header"/> 必须至少 <see cref="HeaderLength"/> 字节。
@@ -115,7 +142,17 @@ public static class DbpfPrecheck
 
         var entryCount = BinaryPrimitives.ReadUInt32LittleEndian(header[OffsetEntryCount..]);
         var indexSize = BinaryPrimitives.ReadUInt32LittleEndian(header[OffsetIndexSize..]);
-        var indexPosition = BinaryPrimitives.ReadUInt32LittleEndian(header[OffsetIndexPosition..]);
+
+        // 索引位置有新旧两个字段：0x40 是 64 位的，0x28 是老式 32 位的。
+        // 第三方库的规则是 64 位非 0 就用它，否则退回老字段——
+        // 只读 0x40 的低 32 位，会在超过 4 GiB 时截断，也会把只填了老字段的
+        // package 误判成「索引位置为 0」而拒收。
+        var indexPosition = BinaryPrimitives.ReadUInt64LittleEndian(header[OffsetIndexPosition..]);
+        if (indexPosition == 0)
+        {
+            indexPosition = BinaryPrimitives.ReadUInt32LittleEndian(
+                header[OffsetLegacyIndexPosition..]);
+        }
 
         parsed = new DbpfHeader(major, minor, entryCount, indexSize, indexVersion, indexPosition);
 
@@ -153,9 +190,9 @@ public static class DbpfPrecheck
                     + $"位置至少应为 {HeaderLength}，大小至少应为 {IndexTypeFieldLength}。");
         }
 
-        // 两个字段都是 uint32，先各自提升到 long 再相加，避免 32 位回绕后落进合法区间。
-        var indexEnd = (long)indexPosition + indexSize;
-        if (indexEnd > fileLength)
+        // 位置是 64 位、长度是 32 位；用 UInt128 相加，任何取值都不会回绕。
+        var indexEnd = (UInt128)indexPosition + indexSize;
+        if (indexEnd > (UInt128)fileLength)
         {
             return new PackageReadIssue(
                 PackageReadIssueCode.IndexOutOfBounds,
@@ -194,9 +231,17 @@ public static class DbpfPrecheck
         var constantFieldCount = BitOperations.PopCount(indexType);
         var fieldsPerEntry = IndexFieldsPerEntry - constantFieldCount;
         var indexHeaderLength = IndexTypeFieldLength + (constantFieldCount * sizeof(uint));
-        var expected = indexHeaderLength + ((long)entryCount * fieldsPerEntry * sizeof(uint));
+        var baseLength = indexHeaderLength + ((long)entryCount * fieldsPerEntry * sizeof(uint));
 
-        if (expected != indexSize)
+        // 每条记录可以独立地带或不带 4 字节扩展压缩信息，所以索引长度不是一个定值，
+        // 而是一段区间：全部不带时最短，全部带时最长。多出来的部分必须正好由
+        // 若干个 4 字节扩展块组成，且数量不超过条目数。
+        var maxLength = baseLength + ((long)entryCount * ExtendedCompressionFieldLength);
+        var extra = indexSize - baseLength;
+
+        if (extra < 0
+            || extra > maxLength - baseLength
+            || extra % ExtendedCompressionFieldLength != 0)
         {
             return new PackageReadIssue(
                 PackageReadIssueCode.IndexSizeMismatch,
@@ -204,7 +249,8 @@ public static class DbpfPrecheck
                 path,
                 "这个 package 的索引长度与它声明的资源数量对不上，文件可能已损坏或被截断。",
                 $"位域 0x{indexType:X8} 提取了 {constantFieldCount} 个公共字段，"
-                    + $"索引头 {indexHeaderLength} 字节加 {entryCount} 条记录共应占 {expected} 字节，"
+                    + $"{entryCount} 条记录的索引长度应落在 {baseLength}~{maxLength} 字节之间"
+                    + $"且超出部分为 {ExtendedCompressionFieldLength} 的整数倍，"
                     + $"header 声明 {indexSize} 字节。");
         }
 

@@ -50,6 +50,10 @@ public sealed class LlamaLogicPackageIndexReader(
 
         try
         {
+            // 预检本身要读文件，期间可能被取消；FromPathAsync 没有 CancellationToken
+            // 重载，一旦进去就得等它解析完，所以必须在进去之前先看一眼。
+            cancellationToken.ThrowIfCancellationRequested();
+
             await using var package = await DataBasePackedFile
                 .FromPathAsync(fullPath, forReadOnly: true)
                 .ConfigureAwait(false);
@@ -60,6 +64,21 @@ public sealed class LlamaLogicPackageIndexReader(
             var keys = await package
                 .GetKeysAsync(ResourceKeyOrder.Preserve, cancellationToken)
                 .ConfigureAwait(false);
+
+            // ⚠️ 第三方库用有序 HashSet 和以 ResourceKey 为键的字典存索引，
+            // 同一个 TGI 出现两次就只剩一条。而本工具存在的理由就是找出重复资源——
+            // 在地基上把重复吃掉，上层再怎么比对也找不回来。
+            // 数量对不上时宁可整份作废，也不返回一个少了东西的「成功」。
+            if (keys.Count != precheck.Header.EntryCount)
+            {
+                return PackageReadResult.Failure(new PackageReadIssue(
+                    PackageReadIssueCode.DuplicateResourceKeys,
+                    PackageReadStage.Index,
+                    fullPath,
+                    "这个 package 里有重复的资源键，本工具暂时无法完整分析它。",
+                    $"header 声明 {precheck.Header.EntryCount} 条，"
+                        + $"读出 {keys.Count} 条不重复的资源键。"));
+            }
 
             var resources = new List<PackageResourceEntry>(keys.Count);
             for (var ordinal = 0; ordinal < keys.Count; ordinal++)

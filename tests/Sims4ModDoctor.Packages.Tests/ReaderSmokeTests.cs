@@ -16,8 +16,8 @@ public sealed class ReaderSmokeTests
     {
         using var temp = new TempDirectory();
         var bytes = new DbpfFixtureBuilder()
-            .AddResource(type: 0x0904DF10, group: 0x0000000A, instanceLo: 0x11112222, compressed: 0)
-            .AddResource(type: 0x545AC67A, group: 0x0000000A, instanceLo: 0x33334444, compressed: 0)
+            .AddResource(type: 0x0904DF10, group: 0x0000000A, instanceLo: 0x11112222)
+            .AddResource(type: 0x545AC67A, group: 0x0000000A, instanceLo: 0x33334444)
             .Build();
         var path = temp.WriteBytes("fixture.package", bytes);
 

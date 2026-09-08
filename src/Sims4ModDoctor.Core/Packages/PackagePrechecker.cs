@@ -29,9 +29,19 @@ public sealed class PackagePrechecker(IFileSystemAccess fileSystem)
         PackageSafetyLimits limits,
         out PackagePrecheckResult? result)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(packagePath);
         ArgumentNullException.ThrowIfNull(limits);
         result = null;
+
+        // 空路径按结构化失败处理，不抛异常：批量扫描时一条坏输入不该中断整批，
+        // 而调用方拿到的应该是一个能写进报告的错误码。
+        if (string.IsNullOrWhiteSpace(packagePath))
+        {
+            return new PackageReadIssue(
+                PackageReadIssueCode.PathInvalid,
+                PackageReadStage.Access,
+                packagePath ?? string.Empty,
+                "这个路径是空的。");
+        }
 
         string fullPath;
         try
@@ -153,7 +163,7 @@ public sealed class PackagePrechecker(IFileSystemAccess fileSystem)
         DbpfPrecheck.DbpfHeader parsed,
         string fullPath)
     {
-        stream.Seek(parsed.IndexPosition, SeekOrigin.Begin);
+        stream.Seek((long)parsed.IndexPosition, SeekOrigin.Begin);
 
         Span<byte> indexType = stackalloc byte[DbpfPrecheck.IndexTypeFieldLength];
         stream.ReadExactly(indexType);

@@ -51,10 +51,11 @@ public sealed class DbpfPrecheckTests
     // 这几个用例是它覆盖不到的部分。
     [TestMethod]
     [DataRow(0x00u, DisplayName = "没有公共常量")]
-    [DataRow(0x01u, DisplayName = "Type 提为公共常量")]
-    [DataRow(0x03u, DisplayName = "Type 与 Group 都提为公共常量")]
-    [DataRow(0x0Fu, DisplayName = "整个 TGI 都提为公共常量")]
-    [DataRow(0xFFu, DisplayName = "八个字段全部提为公共常量")]
+    [DataRow(0x01u, DisplayName = "Type")]
+    [DataRow(0x02u, DisplayName = "Group")]
+    [DataRow(0x03u, DisplayName = "Type + Group")]
+    [DataRow(0x04u, DisplayName = "Instance 高位")]
+    [DataRow(0x07u, DisplayName = "三位全部")]
     public void AcceptsEveryKnownConstantFieldLayout(uint indexType)
     {
         var package = new DbpfFixtureBuilder()
@@ -69,17 +70,113 @@ public sealed class DbpfPrecheckTests
         Assert.AreEqual(5u, result.Header.EntryCount);
     }
 
+    // 依赖的第三方库只实现三个常量位。其余位置位时它会忽略 flag 并按错误布局
+    // 逐条读取，读出一堆看起来正常的假资源键——所以必须在预检就拒绝。
     [TestMethod]
-    public void RejectsAnIndexTypeWithBitsOutsideTheKnownEight()
+    [DataRow(0x08u, DisplayName = "Instance 低位（社区文档有，库没实现）")]
+    [DataRow(0x20u, DisplayName = "Size")]
+    [DataRow(0x80u, DisplayName = "Compressed")]
+    [DataRow(0x100u, DisplayName = "已知八位之外")]
+    public void RejectsAnIndexTypeOutsideTheThreeSupportedBits(uint indexType)
     {
         var package = new DbpfFixtureBuilder().AddResources(2).Build();
-        var indexPosition = BinaryPrimitives.ReadUInt32LittleEndian(package.AsSpan(0x40));
-        BinaryPrimitives.WriteUInt32LittleEndian(package.AsSpan((int)indexPosition), 0x100);
+        var indexPosition = BinaryPrimitives.ReadUInt64LittleEndian(package.AsSpan(0x40));
+        BinaryPrimitives.WriteUInt32LittleEndian(package.AsSpan((int)indexPosition), indexType);
 
         var issue = Inspect(package, out var result);
 
         Assert.IsNotNull(issue);
         Assert.AreEqual(PackageReadIssueCode.UnsupportedIndexVersion, issue.Code);
+        Assert.IsNull(result);
+    }
+
+    // 扩展压缩字段逐条可选，所以索引长度是一段区间而不是一个定值。
+    [TestMethod]
+    [DataRow(true, DisplayName = "每条都带扩展压缩字段")]
+    [DataRow(false, DisplayName = "每条都不带")]
+    public void AcceptsBothExtendedAndPlainRecords(bool extended)
+    {
+        var package = new DbpfFixtureBuilder().AddResources(4, extended).Build();
+
+        var issue = Inspect(package, out var result);
+
+        Assert.IsNull(issue, issue?.Detail);
+        Assert.IsNotNull(result);
+        Assert.AreEqual(4u, result.Header.EntryCount);
+    }
+
+    [TestMethod]
+    public void AcceptsAMixOfExtendedAndPlainRecords()
+    {
+        var package = new DbpfFixtureBuilder()
+            .AddResource(extended: true)
+            .AddResource(extended: false)
+            .AddResource(extended: true)
+            .Build();
+
+        var issue = Inspect(package, out var result);
+
+        Assert.IsNull(issue, issue?.Detail);
+        Assert.IsNotNull(result);
+    }
+
+    // 多出来的字节必须正好由若干个 4 字节扩展块组成。
+    [TestMethod]
+    public void RejectsAnIndexSizeThatIsNotAWholeNumberOfExtensionBlocks()
+    {
+        var package = new DbpfFixtureBuilder().AddResources(3).Build();
+        var declared = BinaryPrimitives.ReadUInt32LittleEndian(package.AsSpan(0x2C));
+        BinaryPrimitives.WriteUInt32LittleEndian(package.AsSpan(0x2C), declared - 2);
+
+        var issue = Inspect(package, out _);
+
+        Assert.IsNotNull(issue);
+        Assert.AreEqual(PackageReadIssueCode.IndexSizeMismatch, issue.Code);
+    }
+
+    // 索引位置有新旧两个字段。只读 64 位那个，会把只填了老字段的 package
+    // 误判成「索引位置为 0」而拒收。
+    [TestMethod]
+    public void AcceptsAPackageThatOnlyFillsTheLegacyIndexPosition()
+    {
+        var package = new DbpfFixtureBuilder()
+            .WithLegacyIndexPosition()
+            .AddResources(3)
+            .Build();
+
+        Assert.AreEqual(0ul, BinaryPrimitives.ReadUInt64LittleEndian(package.AsSpan(0x40)));
+
+        var issue = Inspect(package, out var result);
+
+        Assert.IsNull(issue, issue?.Detail);
+        Assert.IsNotNull(result);
+        Assert.AreEqual(3u, result.Header.EntryCount);
+    }
+
+    [TestMethod]
+    public void ReadsTheIndexPositionAsSixtyFourBits()
+    {
+        var package = new DbpfFixtureBuilder().AddResources(2).Build();
+        // 高 32 位置位后，位置远超文件长度，必须被判越界而不是被截断成一个合法值。
+        BinaryPrimitives.WriteUInt32LittleEndian(package.AsSpan(0x44), 1);
+
+        var issue = Inspect(package, out _);
+
+        Assert.IsNotNull(issue);
+        Assert.AreEqual(PackageReadIssueCode.IndexOutOfBounds, issue.Code);
+    }
+
+    [TestMethod]
+    [DataRow(null, DisplayName = "null")]
+    [DataRow("", DisplayName = "空字符串")]
+    [DataRow("   ", DisplayName = "纯空白")]
+    public void ReturnsAStructuredIssueForAnEmptyPath(string? path)
+    {
+        var issue = PackagePrechecker.CreateDefault()
+            .Inspect(path!, PackageSafetyLimits.Default, out var result);
+
+        Assert.IsNotNull(issue);
+        Assert.AreEqual(PackageReadIssueCode.PathInvalid, issue.Code);
         Assert.IsNull(result);
     }
 
@@ -214,7 +311,8 @@ public sealed class DbpfPrecheckTests
             .AddResources(4)
             .Build();
         var declared = BinaryPrimitives.ReadUInt32LittleEndian(package.AsSpan(0x2C));
-        BinaryPrimitives.WriteUInt32LittleEndian(package.AsSpan(0x2C), declared - 8);
+        // 减到区间下界之下：4 条记录最少也要 baseLength，再少就不可能是合法索引。
+        BinaryPrimitives.WriteUInt32LittleEndian(package.AsSpan(0x2C), declared - 40);
 
         var issue = Inspect(package, out _);
 
