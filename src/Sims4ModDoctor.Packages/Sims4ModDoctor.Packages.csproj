@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Sims4ModDoctor.Packages</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LlamaLogic.Packages" Version="3.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sims4ModDoctor.Core\Sims4ModDoctor.Core.csproj" />
+  </ItemGroup>
+
+</Project>
