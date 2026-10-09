@@ -1,7 +1,8 @@
 using System.Buffers;
 using System.Buffers.Binary;
-using System.IO.Compression;
 using System.Security.Cryptography;
+using ICSharpCode.SharpZipLib;
+using ICSharpCode.SharpZipLib.Zip.Compression;
 using Sims4ModDoctor.Core.Conflicts;
 using Sims4ModDoctor.Core.Duplicates;
 using Sims4ModDoctor.Core.Packages;
@@ -415,9 +416,10 @@ public sealed class DbpfResourceContentHasher(
         try
         {
             stream.Seek(entry.Position, SeekOrigin.Begin);
-            var stored = new BoundedReadStream(stream, entry.StoredSize, budget, cancellationToken);
+            using var stored = new BoundedReadStream(stream, entry.StoredSize, budget, cancellationToken,
+                entry.Compression == CompressionNone ? 2 : 1);
             return entry.Compression == CompressionNone
-                ? await HashStoredAsync(stored, target, entry, budget, cancellationToken).ConfigureAwait(false)
+                ? await HashStoredAsync(stored, target, entry, cancellationToken).ConfigureAwait(false)
                 : await HashZlibAsync(stored, target, entry, limits, budget, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -435,7 +437,7 @@ public sealed class DbpfResourceContentHasher(
             return Fail(target, ResourceContentIssueCode.Truncated, ResourceContentStage.Read,
                 "这条资源的数据比索引声明的短，文件可能已被截断。");
         }
-        catch (InvalidDataException exception)
+        catch (Exception exception) when (exception is InvalidDataException or SharpZipBaseException)
         {
             return Fail(target, ResourceContentIssueCode.Corrupt, ResourceContentStage.Decompress,
                 "这条资源的压缩数据已损坏，无法解压。",
@@ -455,7 +457,6 @@ public sealed class DbpfResourceContentHasher(
         BoundedReadStream stored,
         ResourceContentTarget target,
         IndexEntry entry,
-        ResourceContentBudget budget,
         CancellationToken cancellationToken)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -484,12 +485,10 @@ public sealed class DbpfResourceContentHasher(
     }
 
     /// <summary>
-    /// zlib：流式解压，按实际输出字节执行上限，边解边算 SHA-256 与 Adler-32。
+    /// zlib：按预算分块解压与哈希，由 Inflater 校验结束块与 Adler-32。
     /// </summary>
     /// <remarks>
-    /// 成功的条件同时包括：输出恰好等于声明长度、zlib 流正常结束、
-    /// 存储数据最后 4 字节的 Adler-32 与实际输出一致。
-    /// 最后一条由本类自己核对，不依赖运行库在截断时是否报错。
+    /// 成功要求 IsFinished、输入恰好耗尽且输出长度匹配；底层 EOF 不代表解压完成。
     /// 输出一旦超过声明长度或单条上限立即停止，不会先解压完再判断。
     /// </remarks>
     private static async Task<ResourceContentResult> HashZlibAsync(
@@ -509,45 +508,81 @@ public sealed class DbpfResourceContentHasher(
 
         var cap = Math.Min(entry.DeclaredSize, limits.MaxDecompressedBytesPerResource);
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        var adler = new Adler32();
         var buffer = ArrayPool<byte>.Shared.Rent(ChunkSize);
+        var input = ArrayPool<byte>.Shared.Rent(ChunkSize);
+        var inflater = new Inflater();
         try
         {
             long total = 0;
-            await using (var inflater = new ZLibStream(stored, CompressionMode.Decompress, leaveOpen: true))
+            var zeroOutputSteps = 0;
+            while (!inflater.IsFinished)
             {
-                while (true)
+                cancellationToken.ThrowIfCancellationRequested();
+                var request = (int)Math.Min(ChunkSize, cap - total + 1);
+                int read;
+                int granted;
+                var inputBefore = inflater.TotalIn;
+                // 预留输出额度时不读取底层流，避免输出预留抢占输入所需的共享额度。
+                using (var reservation = await budget.ReserveUpToAsync(request, cancellationToken: cancellationToken)
+                    .ConfigureAwait(false))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    // 多要 1 字节：恰好读满上限时还要能分辨「刚好结束」与「还有更多」。
-                    var request = (int)Math.Min(ChunkSize, cap - total + 1);
-                    var read = await inflater.ReadAsync(buffer.AsMemory(0, request), cancellationToken).ConfigureAwait(false);
-                    if (read == 0)
-                    {
-                        break;
-                    }
-
-                    total += read;
-                    if (total > cap)
-                    {
-                        return total > entry.DeclaredSize
-                            ? Fail(target, ResourceContentIssueCode.LengthMismatch, ResourceContentStage.Decompress,
-                                "这条资源解压出来的内容比声明的长，已停止解压。",
-                                $"声明 {entry.DeclaredSize} 字节，实际输出已超过。")
-                            : Fail(target, ResourceContentIssueCode.DecompressedSizeExceedsLimit, ResourceContentStage.Decompress,
-                                "这条资源解压后的大小超出了单条上限，已停止解压。",
-                                $"上限 {limits.MaxDecompressedBytesPerResource} 字节。");
-                    }
-
-                    if (!budget.TryConsume(read))
+                    granted = reservation.GrantedBytes;
+                    if (granted == 0 && total < entry.DeclaredSize)
                     {
                         throw new BudgetExhaustedException();
                     }
-
-                    hash.AppendData(buffer, 0, read);
-                    adler.Append(buffer.AsSpan(0, read));
+                    var outputBefore = inflater.TotalOut;
+                    try
+                    {
+                        read = inflater.Inflate(buffer, 0, granted);
+                    }
+                    finally
+                    {
+                        // 即使本次调用在校验和处抛错，也结算已交付的输出。
+                        reservation.Complete(checked((int)(inflater.TotalOut - outputBefore)));
+                    }
                 }
+
+                total += read;
+                if (total > cap)
+                {
+                    return Fail(target, ResourceContentIssueCode.LengthMismatch, ResourceContentStage.Decompress,
+                        "这条资源解压出来的内容比声明的长，已停止解压。",
+                        $"声明 {entry.DeclaredSize} 字节，实际输出已超过。");
+                }
+
+                if (read > 0)
+                {
+                    hash.AppendData(buffer, 0, read);
+                    zeroOutputSteps = 0;
+                    continue;
+                }
+
+                if (inflater.IsFinished) break;
+                if (inflater.IsNeedingDictionary)
+                {
+                    throw new InvalidDataException("Preset zlib dictionaries are not supported.");
+                }
+
+                if (inflater.IsNeedingInput)
+                {
+                    var count = await stored.ReadAsync(input.AsMemory(0, ChunkSize), cancellationToken).ConfigureAwait(false);
+                    if (count == 0) throw new EndOfStreamException();
+                    inflater.SetInput(input, 0, count);
+                    zeroOutputSteps = 0;
+                    continue;
+                }
+
+                if (granted == 0)
+                {
+                    // 预算恰好用满时允许无输出的结束块/校验和状态转换。
+                    // 无进展表示仍有待输出内容，不能绕过预算取一个探测字节。
+                    zeroOutputSteps = inflater.TotalIn != inputBefore ? 0 : zeroOutputSteps + 1;
+                    if (zeroOutputSteps < 4) continue;
+                    throw new BudgetExhaustedException();
+                }
+
+                throw new InvalidDataException("Inflater made no progress before stream end.");
             }
 
             if (total != entry.DeclaredSize)
@@ -557,18 +592,10 @@ public sealed class DbpfResourceContentHasher(
                     $"声明 {entry.DeclaredSize} 字节，实际 {total} 字节。");
             }
 
-            // 解压器可能已经把末尾读进了自己的缓冲；把剩下的存储数据读完，拿到真正的最后 4 字节。
-            await stored.DrainAsync(cancellationToken).ConfigureAwait(false);
-            if (stored.Consumed != entry.StoredSize)
-            {
-                throw new EndOfStreamException();
-            }
-
-            if (stored.Tail != adler.Value)
+            if (inflater.RemainingInput != 0 || stored.Consumed != entry.StoredSize)
             {
                 return Fail(target, ResourceContentIssueCode.Corrupt, ResourceContentStage.Decompress,
-                    "这条资源的压缩数据校验失败，内容可能已损坏。",
-                    $"Adler-32 期望 0x{stored.Tail:X8}，实际 0x{adler.Value:X8}。");
+                    "这条资源的压缩流结束后仍有多余数据。");
             }
 
             return ResourceContentResult.Success(target, Convert.ToHexString(hash.GetHashAndReset()), total);
@@ -576,6 +603,7 @@ public sealed class DbpfResourceContentHasher(
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
+            ArrayPool<byte>.Shared.Return(input);
         }
     }
 
@@ -610,21 +638,16 @@ public sealed class DbpfResourceContentHasher(
     private sealed class BudgetExhaustedException : Exception;
 
     /// <summary>
-    /// 只读、只前进的子流：从当前位置起最多读 <c>length</c> 字节，每次读取先从共享预算里扣，
-    /// 并记住最后 4 字节（zlib 的 Adler-32）。
+    /// 只读、只前进的子流：最多读 length 字节，读取前预留预算，按实际读取量结算。
     /// </summary>
     private sealed class BoundedReadStream(
         Stream inner,
         long length,
         ResourceContentBudget budget,
-        CancellationToken cancellationToken) : Stream
+        CancellationToken cancellationToken,
+        int bytesPerUnit = 1) : Stream
     {
-        private uint _tail;
-
         public long Consumed { get; private set; }
-
-        /// <summary>已读数据的最后 4 字节，按大端解释（zlib 的 Adler-32 是大端存储）。</summary>
-        public uint Tail => _tail;
 
         public override bool CanRead => true;
 
@@ -652,18 +675,20 @@ public sealed class DbpfResourceContentHasher(
                 return 0;
             }
 
-            if (!budget.TryConsume(want))
+            using var reservation = budget.ReserveUpTo(want, bytesPerUnit);
+            if (reservation.GrantedBytes == 0)
             {
                 throw new BudgetExhaustedException();
             }
 
-            var read = inner.Read(buffer[..want]);
+            var read = inner.Read(buffer[..reservation.GrantedBytes]);
+            reservation.Complete(read);
             if (read == 0)
             {
                 throw new EndOfStreamException();
             }
 
-            Track(buffer[..read]);
+            Consumed += read;
             return read;
         }
 
@@ -677,48 +702,25 @@ public sealed class DbpfResourceContentHasher(
                 return 0;
             }
 
-            if (!budget.TryConsume(want))
+            using var reservation = await budget.ReserveUpToAsync(want, bytesPerUnit, linked.Token).ConfigureAwait(false);
+            if (reservation.GrantedBytes == 0)
             {
                 throw new BudgetExhaustedException();
             }
 
-            var read = await inner.ReadAsync(buffer[..want], linked.Token).ConfigureAwait(false);
+            var read = await inner.ReadAsync(buffer[..reservation.GrantedBytes], linked.Token).ConfigureAwait(false);
+            reservation.Complete(read);
             if (read == 0)
             {
                 throw new EndOfStreamException();
             }
 
-            Track(buffer.Span[..read]);
+            Consumed += read;
             return read;
         }
 
         public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken token) =>
             ReadAsync(buffer.AsMemory(offset, count), token).AsTask();
-
-        /// <summary>读完剩余部分（解压器提前结束时用来取到真正的末尾）。</summary>
-        public async Task DrainAsync(CancellationToken token)
-        {
-            var scratch = ArrayPool<byte>.Shared.Rent(ChunkSize);
-            try
-            {
-                while (await ReadAsync(scratch.AsMemory(0, ChunkSize), token).ConfigureAwait(false) > 0)
-                {
-                }
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(scratch);
-            }
-        }
-
-        private void Track(ReadOnlySpan<byte> data)
-        {
-            Consumed += data.Length;
-            foreach (var value in data.Length > 4 ? data[^4..] : data)
-            {
-                _tail = (_tail << 8) | value;
-            }
-        }
 
         public override void Flush()
         {
@@ -731,34 +733,4 @@ public sealed class DbpfResourceContentHasher(
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    /// <summary>zlib 尾部使用的 Adler-32，增量计算。</summary>
-    private sealed class Adler32
-    {
-        private const uint Modulus = 65521;
-
-        // 5552 是保证 32 位累加不溢出的最大块长（zlib 的 NMAX）。
-        private const int MaxBlock = 5552;
-
-        private uint _a = 1;
-        private uint _b;
-
-        public uint Value => (_b << 16) | _a;
-
-        public void Append(ReadOnlySpan<byte> data)
-        {
-            while (!data.IsEmpty)
-            {
-                var block = data.Length > MaxBlock ? data[..MaxBlock] : data;
-                foreach (var value in block)
-                {
-                    _a += value;
-                    _b += _a;
-                }
-
-                _a %= Modulus;
-                _b %= Modulus;
-                data = data[block.Length..];
-            }
-        }
-    }
 }

@@ -9,6 +9,8 @@
 ### 直接依赖
 
 - `LlamaLogic.Packages` 3.8.2 — MIT — https://github.com/Llama-Logic/LlamaLogic
+- `SharpZipLib` 1.4.2 — MIT — https://github.com/icsharpcode/SharpZipLib
+  （用于有界流式 zlib 解压及显式结束状态校验；原本也由 LlamaLogic 传递引入。）
 
 ### 传递依赖
 
@@ -29,7 +31,6 @@
 | `Nito.Cancellation` | 1.1.2 | MIT |
 | `Nito.Collections.Deque` | 1.1.1 | MIT |
 | `Nito.Disposables` | 2.2.1 | MIT |
-| `SharpZipLib` | 1.4.2 | MIT |
 | `SixLabors.ImageSharp` | 3.1.11 | Six Labors Split License 1.0（见下） |
 | `System.Collections.Immutable` | 8.0.0 | MIT |
 | `YamlDotNet` | 16.3.0 | MIT |

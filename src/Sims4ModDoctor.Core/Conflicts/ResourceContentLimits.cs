@@ -59,7 +59,10 @@ public sealed record ResourceContentLimits(
 /// </summary>
 public sealed class ResourceContentBudget
 {
+    private readonly object _gate = new();
     private long _consumed;
+    private long _reserved;
+    private TaskCompletionSource _budgetChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public ResourceContentBudget(long totalBytes)
     {
@@ -69,7 +72,7 @@ public sealed class ResourceContentBudget
 
     public long TotalBytes { get; }
 
-    public long ConsumedBytes => Volatile.Read(ref _consumed);
+    public long ConsumedBytes { get { lock (_gate) return _consumed; } }
 
     /// <summary>
     /// 尝试扣除 <paramref name="bytes"/>。余额不足时不扣、返回 <see langword="false"/>。
@@ -77,18 +80,101 @@ public sealed class ResourceContentBudget
     public bool TryConsume(long bytes)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(bytes);
-        while (true)
+        lock (_gate)
         {
-            var current = Volatile.Read(ref _consumed);
-            var next = current + bytes;
-            if (next > TotalBytes || next < current)
+            if (bytes > TotalBytes - _consumed - _reserved)
             {
                 return false;
             }
+            _consumed += bytes;
+            return true;
+        }
+    }
 
-            if (Interlocked.CompareExchange(ref _consumed, next, current) == current)
+    /// <summary>
+    /// 在 IO 或解压前预留最多 maxBytes 字节；额度不足时允许缩小本次缓冲。
+    /// bytesPerUnit=2 用于未压缩数据，同时计入读取和内容输出。
+    /// 未使用的额度在 Complete 或 Dispose 时退还，已结算量只增不减。
+    /// </summary>
+    public Reservation ReserveUpTo(int maxBytes, int bytesPerUnit = 1)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(maxBytes);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bytesPerUnit, 1);
+        lock (_gate)
+        {
+            var granted = (int)Math.Min(maxBytes, (TotalBytes - _consumed - _reserved) / bytesPerUnit);
+            var reservation = new Reservation(this, granted, bytesPerUnit);
+            _reserved += (long)granted * bytesPerUnit;
+            return reservation;
+        }
+    }
+
+    /// <summary>其他任务临时占用全部余额时，等待结算而不是误报预算耗尽。</summary>
+    public async ValueTask<Reservation> ReserveUpToAsync(
+        int maxBytes, int bytesPerUnit = 1, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(maxBytes);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bytesPerUnit, 1);
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Task changed;
+            lock (_gate)
             {
-                return true;
+                if (maxBytes == 0 || _reserved == 0 || TotalBytes - _consumed - _reserved >= bytesPerUnit)
+                {
+                    return ReserveUpTo(maxBytes, bytesPerUnit);
+                }
+                changed = _budgetChanged.Task;
+            }
+            await changed.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private void NotifySettlement()
+    {
+        var changed = _budgetChanged;
+        _budgetChanged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        changed.TrySetResult();
+    }
+
+    public sealed class Reservation : IDisposable
+    {
+        private readonly ResourceContentBudget _owner;
+        private readonly int _bytesPerUnit;
+        private bool _settled;
+
+        internal Reservation(ResourceContentBudget owner, int grantedBytes, int bytesPerUnit)
+        {
+            _owner = owner;
+            GrantedBytes = grantedBytes;
+            _bytesPerUnit = bytesPerUnit;
+        }
+
+        public int GrantedBytes { get; }
+
+        public void Complete(int actualBytes)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(actualBytes);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(actualBytes, GrantedBytes);
+            lock (_owner._gate)
+            {
+                if (_settled) throw new InvalidOperationException("Reservation already settled.");
+                _owner._reserved -= (long)GrantedBytes * _bytesPerUnit;
+                _owner._consumed += (long)actualBytes * _bytesPerUnit;
+                _settled = true;
+                _owner.NotifySettlement();
+            }
+        }
+
+        public void Dispose()
+        {
+            lock (_owner._gate)
+            {
+                if (_settled) return;
+                _owner._reserved -= (long)GrantedBytes * _bytesPerUnit;
+                _settled = true;
+                _owner.NotifySettlement();
             }
         }
     }

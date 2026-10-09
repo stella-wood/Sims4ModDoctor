@@ -197,7 +197,7 @@ public sealed class ResourceContentHasherTests
             .AddContent(Content)
             .AddContent(Content)
             .Build());
-        var budget = new ResourceContentBudget(Content.Length + 100);
+        var budget = new ResourceContentBudget(2L * Content.Length + 100);
 
         var batch = await HashAsync(path, [0, 1], budget: budget);
 
