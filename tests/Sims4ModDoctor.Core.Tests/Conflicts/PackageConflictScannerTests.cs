@@ -53,6 +53,9 @@ public sealed class PackageConflictScannerTests
         Assert.AreEqual(PackageCompression.Zlib, occurrence.Compression);
         Assert.AreEqual("ZLIB", occurrence.CompressionRaw);
         CollectionAssert.AreEqual(new[] { "mods" }, occurrence.SourceIds.ToArray());
+
+        // 候选里带着索引扫描时的文件戳，后续内容比较拿它当期望版本。
+        Assert.AreEqual(new FileStamp(1, DateTime.UnixEpoch), occurrence.PackageStamp);
     }
 
     [TestMethod]

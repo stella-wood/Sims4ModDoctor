@@ -236,6 +236,7 @@ public sealed class PackageConflictScanner(
                 occurrences.Add(new PackageResourceOccurrence(
                     entry.Key,
                     package.Path,
+                    package.Summary.Stamp,
                     sourceIds,
                     entry.Ordinal,
                     entry.ContentSize,

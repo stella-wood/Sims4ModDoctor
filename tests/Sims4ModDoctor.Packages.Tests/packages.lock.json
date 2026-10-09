@@ -313,6 +313,7 @@
         "type": "Project",
         "dependencies": {
           "LlamaLogic.Packages": "[3.8.2, )",
+          "SharpZipLib": "[1.4.2, )",
           "Sims4ModDoctor.Core": "[1.0.0, )"
         }
       }

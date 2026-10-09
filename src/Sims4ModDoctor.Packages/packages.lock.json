@@ -16,6 +16,12 @@
           "YamlDotNet": "16.3.0"
         }
       },
+      "SharpZipLib": {
+        "type": "Direct",
+        "requested": "[1.4.2, )",
+        "resolved": "1.4.2",
+        "contentHash": "yjj+3zgz8zgXpiiC3ZdF/iyTBbz2fFvMxZFEBPUcwZjIvXOf37Ylm+K58hqMfIBt5JgU/Z2uoUS67JmTLe973A=="
+      },
       "BCnEncoder.Net": {
         "type": "Transitive",
         "resolved": "2.2.0",
@@ -113,11 +119,6 @@
         "dependencies": {
           "System.Collections.Immutable": "1.7.1"
         }
-      },
-      "SharpZipLib": {
-        "type": "Transitive",
-        "resolved": "1.4.2",
-        "contentHash": "yjj+3zgz8zgXpiiC3ZdF/iyTBbz2fFvMxZFEBPUcwZjIvXOf37Ylm+K58hqMfIBt5JgU/Z2uoUS67JmTLe973A=="
       },
       "SixLabors.ImageSharp": {
         "type": "Transitive",
