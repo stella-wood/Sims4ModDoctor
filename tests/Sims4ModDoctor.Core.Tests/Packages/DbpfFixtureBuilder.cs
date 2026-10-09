@@ -32,7 +32,18 @@ internal sealed class DbpfFixtureBuilder
         uint Group,
         uint InstanceHi,
         uint InstanceLo,
-        bool Extended);
+        bool Extended,
+        byte[]? Stored = null,
+        ushort Compression = 0,
+        uint? DeclaredSize = null);
+
+    /// <summary>默认的 4 字节存储数据（未指定内容时使用）。</summary>
+    private static readonly byte[] DefaultPayload = [0x44, 0x33, 0x22, 0x11];
+
+    public const ushort CompressionNone = 0x0000;
+    public const ushort CompressionZlib = 0x5A42;
+    public const ushort CompressionDeleted = 0xFFE0;
+    public const ushort CompressionInternal = 0xFFFF;
 
     public DbpfFixtureBuilder WithMagic(string magic)
     {
@@ -90,6 +101,45 @@ internal sealed class DbpfFixtureBuilder
         return this;
     }
 
+    /// <summary>
+    /// 添加一条带指定存储数据的资源。<paramref name="stored"/> 原样写进数据区；
+    /// <paramref name="declaredSize"/> 是索引里声明的解压后大小，缺省为存储长度。
+    /// 未压缩以外的压缩方式只能写在扩展压缩字段里，因此记录总是扩展格式。
+    /// </summary>
+    public DbpfFixtureBuilder AddContent(
+        byte[] stored,
+        ushort compression = CompressionNone,
+        uint? declaredSize = null,
+        uint type = 0x0904DF10,
+        uint group = 0,
+        uint instanceHi = 0,
+        uint? instanceLo = null)
+    {
+        _resources.Add(new Resource(
+            type,
+            group,
+            instanceHi,
+            instanceLo ?? (uint)(0xD1D50000 + _resources.Count),
+            Extended: true,
+            stored,
+            compression,
+            declaredSize));
+        return this;
+    }
+
+    /// <summary>用 zlib（RFC 1950，带头与 Adler-32 尾）压缩，供 <see cref="AddContent"/> 使用。</summary>
+    public static byte[] Zlib(byte[] content, System.IO.Compression.CompressionLevel level =
+        System.IO.Compression.CompressionLevel.Optimal)
+    {
+        using var output = new MemoryStream();
+        using (var zlib = new System.IO.Compression.ZLibStream(output, level, leaveOpen: true))
+        {
+            zlib.Write(content);
+        }
+
+        return output.ToArray();
+    }
+
     public DbpfFixtureBuilder AddResources(int count, bool extended = true)
     {
         for (var index = 0; index < count; index++)
@@ -102,8 +152,15 @@ internal sealed class DbpfFixtureBuilder
 
     public byte[] Build()
     {
-        const int payloadLength = sizeof(uint);
-        var dataLength = _resources.Count * payloadLength;
+        var payloads = _resources.Select(resource => resource.Stored ?? DefaultPayload).ToArray();
+        var offsets = new int[payloads.Length];
+        var dataLength = 0;
+        for (var index = 0; index < payloads.Length; index++)
+        {
+            offsets[index] = DbpfPrecheck.HeaderLength + dataLength;
+            dataLength += payloads[index].Length;
+        }
+
         var indexPosition = DbpfPrecheck.HeaderLength + dataLength;
 
         var constantFields = BitOperations.PopCount(_indexType & DbpfPrecheck.KnownIndexTypeMask);
@@ -143,9 +200,9 @@ internal sealed class DbpfFixtureBuilder
             return buffer;
         }
 
-        for (var index = 0; index < _resources.Count; index++)
+        for (var index = 0; index < payloads.Length; index++)
         {
-            WriteUInt32(span, DbpfPrecheck.HeaderLength + (index * payloadLength), 0x11223344);
+            payloads[index].CopyTo(span[offsets[index]..]);
         }
 
         var cursor = indexPosition;
@@ -180,21 +237,21 @@ internal sealed class DbpfFixtureBuilder
             WriteUInt32(span, cursor, resource.InstanceLo);
             cursor += sizeof(uint);
 
-            WriteUInt32(span, cursor, (uint)(DbpfPrecheck.HeaderLength + (index * payloadLength)));
+            WriteUInt32(span, cursor, (uint)offsets[index]);
             cursor += sizeof(uint);
 
             // Size 的最高位就是扩展压缩标志。
-            var size = (uint)payloadLength;
+            var size = (uint)payloads[index].Length;
             WriteUInt32(span, cursor, resource.Extended ? size | 0x8000_0000 : size);
             cursor += sizeof(uint);
 
-            WriteUInt32(span, cursor, (uint)payloadLength);
+            WriteUInt32(span, cursor, resource.DeclaredSize ?? size);
             cursor += sizeof(uint);
 
             if (resource.Extended)
             {
                 // CompressionTypeMethodNumber(ushort) + mnCommitted(ushort)
-                WriteUInt32(span, cursor, 0x0001_0000);
+                WriteUInt32(span, cursor, 0x0001_0000u | resource.Compression);
                 cursor += DbpfPrecheck.ExtendedCompressionFieldLength;
             }
         }

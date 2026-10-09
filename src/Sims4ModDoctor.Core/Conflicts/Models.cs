@@ -35,12 +35,17 @@ public sealed record PackageConflictScanProgress(
 /// 某个 TGI 在某个 package 索引里的一次出现。
 /// 元数据原样取自索引，不读取也不解压资源内容。
 /// </summary>
+/// <param name="PackageStamp">
+/// 读取这份索引时 package 的文件戳。下一阶段读取资源内容时以它为期望版本：
+/// 文件在候选扫描之后被改过，索引里的位置就不再可信，相关比较结果必须作废。
+/// </param>
 /// <param name="SourceIds">
 /// 包含该 package 的所有启用来源，按来源顺序排列。父子目录同时配置时会有多个。
 /// </param>
 public sealed record PackageResourceOccurrence(
     ResourceKey Key,
     string PackagePath,
+    FileStamp PackageStamp,
     IReadOnlyList<string> SourceIds,
     int Ordinal,
     long? ContentSize,
