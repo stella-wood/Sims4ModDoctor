@@ -95,6 +95,7 @@ public sealed class PackageConflictScanner(
         var analyzed = new List<AnalyzedPackage>();
         for (var index = 0; index < packagePaths.Length; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var outcome = results[index];
             if (outcome.Summary is not null)
             {
@@ -112,7 +113,7 @@ public sealed class PackageConflictScanner(
         var report = new PackageConflictScanReport(
             startedAt,
             DateTime.UtcNow,
-            sourceSnapshots,
+            ReadOnlyLists.Freeze(sourceSnapshots),
             packagePaths.Length,
             analyzed.Count,
             ReadOnlyLists.Freeze(incomplete),
@@ -184,10 +185,11 @@ public sealed class PackageConflictScanner(
         {
             throw;
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             // 读取器的契约是「可预期的失败返回结果、不抛异常」。越过契约的异常同样只算这一个文件失败，
             // 不能让一个坏文件或一个读取器缺陷中断整次扫描。
+            // 内存不足必须向上传播，与底层读取器一致，不能报告为可继续的单文件失败。
             return new ReadOutcome(null, new PackageConflictScanIssue(
                 PackageConflictScanIssueCode.UnexpectedReadError,
                 PackageConflictScanIssueStage.IndexRead,
@@ -224,6 +226,7 @@ public sealed class PackageConflictScanner(
 
             foreach (var entry in package.Summary.Resources)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!byKey.TryGetValue(entry.Key, out var occurrences))
                 {
                     occurrences = [];
@@ -241,21 +244,38 @@ public sealed class PackageConflictScanner(
             }
         }
 
-        return ReadOnlyLists.Freeze(byKey
-            .Where(pair => pair.Value
+        // 筛选和结果构建也可能遍历大量资源；在每次枚举时响应取消。
+        var orderedCandidates = EnumerateWithCancellation(byKey, cancellationToken)
+            .Where(pair => EnumerateWithCancellation(pair.Value, cancellationToken)
                 .Select(occurrence => occurrence.PackagePath)
                 .Distinct(PathRules.Comparer)
                 .Skip(1)
                 .Any())
             .OrderBy(pair => pair.Key.Type)
             .ThenBy(pair => pair.Key.Group)
-            .ThenBy(pair => pair.Key.Instance)
+            .ThenBy(pair => pair.Key.Instance);
+
+        return ReadOnlyLists.Freeze(EnumerateWithCancellation(orderedCandidates, cancellationToken)
             .Select(pair => new PackageConflictCandidate(
                 pair.Key,
-                ReadOnlyLists.Freeze(pair.Value
+                ReadOnlyLists.Freeze(EnumerateWithCancellation(
+                    EnumerateWithCancellation(pair.Value, cancellationToken)
                     .OrderBy(occurrence => occurrence.PackagePath, PathRules.Comparer)
                     .ThenBy(occurrence => occurrence.PackagePath, StringComparer.Ordinal)
-                    .ThenBy(occurrence => occurrence.Ordinal)))));
+                    .ThenBy(occurrence => occurrence.Ordinal), cancellationToken)))));
+    }
+
+    private static IEnumerable<T> EnumerateWithCancellation<T>(
+        IEnumerable<T> items,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var item in items)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return item;
+        }
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     private static IReadOnlyList<string> SourceIdsFor(string path, IReadOnlyList<NormalizedSource> sources) =>

@@ -413,6 +413,7 @@ public sealed class PackageConflictScannerTests
 
         // 数组也实现 IReadOnlyList，但调用方可以把它转回数组改写；这里要求交出去的都不是数组或 List。
         AssertNotMutable(report.Candidates);
+        AssertNotMutable(report.Sources);
         AssertNotMutable(report.Candidates[0].Occurrences);
         AssertNotMutable(report.Candidates[0].Occurrences[0].SourceIds);
         AssertNotMutable(report.IncompletePackagePaths);
