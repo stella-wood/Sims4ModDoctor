@@ -1,4 +1,6 @@
-# Sims 4 Mod Doctor｜Agent 协作指南
+# Sims 4 Mod Sieve｜Agent 协作指南
+
+正式产品名称为 `Sims 4 Mod Sieve`；工程目录、命名空间、程序集和可执行文件使用 `Sims4ModSieve`。
 
 本文约束后续接手本项目的 Agent。目标不是让代码显得“完整”，而是在不破坏现有产品判断的前提下，持续交付可验证、可维护、不过度设计的功能。
 
@@ -48,7 +50,7 @@
 
 已经完成（冲突检测底层，只有 Core / Packages，没有界面）：
 
-- PR #1：只读 DBPF 索引读取与结构预检（`Sims4ModDoctor.Packages`，见其 README）
+- PR #1：只读 DBPF 索引读取与结构预检（`Sims4ModSieve.Packages`，见其 README）
 - PR #2：同一 TGI 出现在多个 package 的候选冲突扫描（`Core/Conflicts/PackageConflictScanner`）
 - PR #3：候选资源的受限读取、解压与内容哈希比较（`Core/Conflicts/ResourceContentComparer`、`Packages/DbpfResourceContentHasher`）；支持未压缩与 zlib，RefPack 返回结构化失败
 - PR #4（审查中，合并前以磁盘代码为准）：`.ts4script` 脚本模块碰撞扫描（`Core/Scripts/ScriptModuleScanner`）
@@ -60,41 +62,40 @@
 - 缓存层
 - 设置页（按钮在，内容空）
 - 发布安装包 / 自动打包
-- 改名为 Sims4ModSieve（已决定，尚未执行）
 
 不要把灰色入口、需求文档或 spike 写成已完成功能。
 
 ### 2.1 项目地图
 
 ```text
-Sims4ModDoctor.sln
+Sims4ModSieve.sln
 ├─ src/
-│  ├─ Sims4ModDoctor.Core/        业务逻辑，不依赖 WPF，也不引用任何第三方 package 库
+│  ├─ Sims4ModSieve.Core/        业务逻辑，不依赖 WPF，也不引用任何第三方 package 库
 │  │  ├─ Duplicates/              重复扫描、建议保留（DuplicateSelectionService）、来源发现与路径规则
 │  │  ├─ Conflicts/               TGI 候选冲突扫描、资源内容比较、处理预算
 │  │  ├─ Scripts/                 .ts4script 模块碰撞（PR #4）
 │  │  ├─ Packages/                DBPF 预检与读取接口（IPackageIndexReader）
 │  │  └─ Reporting/               JSON / HTML 报告
-│  ├─ Sims4ModDoctor.Packages/    唯一引用 LlamaLogic.Packages 的项目；索引读取 + 自写的资源内容读取
-│  ├─ Sims4ModDoctor.Desktop/     WPF 界面：MainWindow.xaml、ViewModels/、Services/（回收站、设置、日志）
-│  └─ Sims4ModDoctor.Cli/         命令行报告
+│  ├─ Sims4ModSieve.Packages/    唯一引用 LlamaLogic.Packages 的项目；索引读取 + 自写的资源内容读取
+│  ├─ Sims4ModSieve.Desktop/     WPF 界面：MainWindow.xaml、ViewModels/、Services/（回收站、设置、日志）
+│  └─ Sims4ModSieve.Cli/         命令行报告
 ├─ tests/
-│  ├─ Sims4ModDoctor.Core.Tests/      Core 单元测试（Linux 也能跑）
-│  ├─ Sims4ModDoctor.Packages.Tests/  DBPF 读取与真实样本测试
-│  ├─ Sims4ModDoctor.Desktop.Tests/   WPF 交互、命中区域、回收站（只能在 Windows 跑）
+│  ├─ Sims4ModSieve.Core.Tests/      Core 单元测试（Linux 也能跑）
+│  ├─ Sims4ModSieve.Packages.Tests/  DBPF 读取与真实样本测试
+│  ├─ Sims4ModSieve.Desktop.Tests/   WPF 交互、命中区域、回收站（只能在 Windows 跑）
 │  └─ fixtures/                       小型测试文件
 ├─ eng/dotnet.cmd                 固定 SDK 的 dotnet 包装
 └─ .github/workflows/ci.yml       Windows CI
 ```
 
-真实样本测试默认跳过，设置环境变量 `SIMS4_MOD_DOCTOR_REAL_MODS=<Mods 路径>` 后运行（`--filter TestCategory=RealCorpus`）。
+真实样本测试默认跳过，设置环境变量 `SIMS4_MOD_SIEVE_REAL_MODS=<Mods 路径>` 后运行（`--filter TestCategory=RealCorpus`）。
 需求文档与架构方案在作者本机 `docs/`，未进仓库；仓库里没有时以本文件和磁盘代码为准。
 
 ## 3. 不可复制的业务规则
 
 ### 3.1 重复副本建议
 
-`Sims4ModDoctor.Core.Duplicates.DuplicateSelectionService` 是建议保留/删除策略的唯一权威：
+`Sims4ModSieve.Core.Duplicates.DuplicateSelectionService` 是建议保留/删除策略的唯一权威：
 
 1. Mods 内部优先保留
 2. 同一范围内目录层级更深者优先
@@ -249,23 +250,23 @@ ViewModel
 
 ```powershell
 # 构建
-.\eng\dotnet.cmd build .\Sims4ModDoctor.sln -c Release --no-restore --nologo
+.\eng\dotnet.cmd build .\Sims4ModSieve.sln -c Release --no-restore --nologo
 
 # 完整测试
-.\eng\dotnet.cmd test .\Sims4ModDoctor.sln -c Release --no-restore --nologo
+.\eng\dotnet.cmd test .\Sims4ModSieve.sln -c Release --no-restore --nologo
 
 # 仅桌面交互测试
-.\eng\dotnet.cmd test .\tests\Sims4ModDoctor.Desktop.Tests\Sims4ModDoctor.Desktop.Tests.csproj `
+.\eng\dotnet.cmd test .\tests\Sims4ModSieve.Desktop.Tests\Sims4ModSieve.Desktop.Tests.csproj `
   -c Release --no-restore --nologo
 
 # 明确授权后运行真实回收站往返测试；只使用自动创建的临时中文文件
-$env:SIMS4_MOD_DOCTOR_RUN_RECYCLE_BIN_TEST='1'
-.\eng\dotnet.cmd test .\tests\Sims4ModDoctor.Desktop.Tests\Sims4ModDoctor.Desktop.Tests.csproj `
+$env:SIMS4_MOD_SIEVE_RUN_RECYCLE_BIN_TEST='1'
+.\eng\dotnet.cmd test .\tests\Sims4ModSieve.Desktop.Tests\Sims4ModSieve.Desktop.Tests.csproj `
   -c Release --no-build --no-restore --nologo `
   --filter 'FullyQualifiedName~UnicodeFileCanRoundTripThroughWindowsRecycleBin'
 
 # 运行桌面版
-.\eng\dotnet.cmd run --project .\src\Sims4ModDoctor.Desktop\Sims4ModDoctor.Desktop.csproj -c Release
+.\eng\dotnet.cmd run --project .\src\Sims4ModSieve.Desktop\Sims4ModSieve.Desktop.csproj -c Release
 ```
 
 ## 10. 代码来源

@@ -6,6 +6,8 @@
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
+    <Product>Sims 4 Mod Sieve</Product>
+    <AssemblyTitle>Sims 4 Mod Sieve</AssemblyTitle>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 </Project>

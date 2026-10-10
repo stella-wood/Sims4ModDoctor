@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net8.0": {
+      "SharpZipLib": {
+        "type": "Transitive",
+        "resolved": "1.4.2",
+        "contentHash": "yjj+3zgz8zgXpiiC3ZdF/iyTBbz2fFvMxZFEBPUcwZjIvXOf37Ylm+K58hqMfIBt5JgU/Z2uoUS67JmTLe973A=="
+      },
+      "sims4modsieve.core": {
+        "type": "Project",
+        "dependencies": {
+          "SharpZipLib": "[1.4.2, )"
+        }
+      }
+    }
+  }
+}

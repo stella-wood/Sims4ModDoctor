@@ -2,9 +2,9 @@
 
 ## Runtime dependencies
 
-`Sims4ModDoctor.Packages` 引用 `LlamaLogic.Packages` 作为只读 DBPF 索引底座。
-该引用被限制在这一个项目内：`Sims4ModDoctor.Core`、`Sims4ModDoctor.Cli` 与
-`Sims4ModDoctor.Desktop` 都不引用它，也不暴露它的任何类型。
+`Sims4ModSieve.Packages` 引用 `LlamaLogic.Packages` 作为只读 DBPF 索引底座。
+该引用被限制在这一个项目内：`Sims4ModSieve.Core`、`Sims4ModSieve.Cli` 与
+`Sims4ModSieve.Desktop` 都不引用它，也不暴露它的任何类型。
 
 ### 直接依赖
 
@@ -16,7 +16,7 @@
 ### 传递依赖
 
 `LlamaLogic.Packages` 自身带入以下包（版本取自
-`src/Sims4ModDoctor.Packages/packages.lock.json`）：
+`src/Sims4ModSieve.Packages/packages.lock.json`）：
 
 | 包 | 版本 | 许可证 |
 |---|---|---|

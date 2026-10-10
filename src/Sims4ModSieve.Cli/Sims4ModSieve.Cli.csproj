@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sims4ModSieve.Core\Sims4ModSieve.Core.csproj" />
+  </ItemGroup>
+</Project>

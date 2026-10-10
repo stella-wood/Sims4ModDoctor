@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Sims4ModSieve.ico</ApplicationIcon>
+    <AssemblyName>Sims4ModSieve</AssemblyName>
+    <RootNamespace>Sims4ModSieve.Desktop</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sims4ModSieve.Core\Sims4ModSieve.Core.csproj" />
+  </ItemGroup>
+</Project>

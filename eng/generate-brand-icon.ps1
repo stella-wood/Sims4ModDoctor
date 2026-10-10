@@ -8,8 +8,8 @@ Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName WindowsBase
 
-$appXamlPath = Join-Path $ProjectRoot 'src\Sims4ModDoctor.Desktop\App.xaml'
-$outputPath = Join-Path $ProjectRoot 'src\Sims4ModDoctor.Desktop\Assets\Sims4ModDoctor.ico'
+$appXamlPath = Join-Path $ProjectRoot 'src\Sims4ModSieve.Desktop\App.xaml'
+$outputPath = Join-Path $ProjectRoot 'src\Sims4ModSieve.Desktop\Assets\Sims4ModSieve.ico'
 
 [xml]$appXaml = Get-Content -LiteralPath $appXamlPath -Raw
 $namespaces = [System.Xml.XmlNamespaceManager]::new($appXaml.NameTable)

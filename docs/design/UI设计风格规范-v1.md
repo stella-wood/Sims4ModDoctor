@@ -1,4 +1,4 @@
-# Sims 4 Mod Doctor · UI 设计风格规范 v1
+# Sims 4 Mod Sieve · UI 设计风格规范 v1
 
 版本日期：2026-10-09  
 用途：为后续冲突检测及其他页面提供可复用的视觉、组件和交互基线。  
@@ -12,11 +12,11 @@
 
 视觉来源：
 
-- [App.xaml](D:/Projects/Sims4ModDoctor/src/Sims4ModDoctor.Desktop/App.xaml)：颜色、字体、按钮、卡片、展开组件及品牌图形资源。
-- [MainWindow.xaml](D:/Projects/Sims4ModDoctor/src/Sims4ModDoctor.Desktop/MainWindow.xaml)：页面结构、尺寸、局部样式与绑定。
-- [DeleteConfirmationWindow.xaml](D:/Projects/Sims4ModDoctor/src/Sims4ModDoctor.Desktop/DeleteConfirmationWindow.xaml)：紧凑确认窗。
-- [MainWindowViewModel.cs](D:/Projects/Sims4ModDoctor/src/Sims4ModDoctor.Desktop/ViewModels/MainWindowViewModel.cs)、[DuplicateResultSession.cs](D:/Projects/Sims4ModDoctor/src/Sims4ModDoctor.Desktop/ViewModels/DuplicateResultSession.cs)：状态、选择及结果会话。
-- [AGENT.md](D:/Projects/Sims4ModDoctor/AGENT.md)：此前已确认的视觉尺度、操作语义及局部改动边界。
+- [App.xaml](../../src/Sims4ModSieve.Desktop/App.xaml)：颜色、字体、按钮、卡片、展开组件及品牌图形资源。
+- [MainWindow.xaml](../../src/Sims4ModSieve.Desktop/MainWindow.xaml)：页面结构、尺寸、局部样式与绑定。
+- [DeleteConfirmationWindow.xaml](../../src/Sims4ModSieve.Desktop/DeleteConfirmationWindow.xaml)：紧凑确认窗。
+- [MainWindowViewModel.cs](../../src/Sims4ModSieve.Desktop/ViewModels/MainWindowViewModel.cs)、[DuplicateResultSession.cs](../../src/Sims4ModSieve.Desktop/ViewModels/DuplicateResultSession.cs)：状态、选择及结果会话。
+- [AGENTS.md](../../AGENTS.md)：此前已确认的视觉尺度、操作语义及局部改动边界。
 
 本地桌面源码基线为 `55f99c2`；与本轮内容比较修复 `9910fb8` 中的 Desktop 源码比较无差异。本文不是对整个本地 main 已同步的声明。
 
@@ -70,7 +70,7 @@
 
 窗口变宽时，内容和卡片舒展；字体、图标和按钮字号不随整页同比放大。不要用整页 Viewbox 代替响应布局。
 
-![首页现状](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/01-home.png)
+![首页现状](./assets/ui-baseline-2026-10-09/01-home.png)
 
 ### 3.3 工作页
 
@@ -97,7 +97,7 @@
 - 来源列表与结果列表各自滚动。结果列表不显示水平滚动条，较长路径省略并提供 Tooltip。
 - 保留结果列表虚拟化与 Recycling；不要换成一次渲染全部大数据的长 StackPanel。
 
-![重复检测结果现状：虚构数据](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/03-scanner-results.png)
+![重复检测结果现状：虚构数据](./assets/ui-baseline-2026-10-09/03-scanner-results.png)
 
 ## 4. 颜色规范
 
@@ -277,11 +277,11 @@
 
 截图均为现有 XAML 加虚构数据的离屏渲染。文字和样例路径用于布局核验，不是玩家真实扫描记录。确认窗截图仅含客户区，原生无文字标题栏需结合 XAML 规格理解。
 
-- [01 首页](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/01-home.png)
-- [02 初始空结果与离线来源](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/02-scanner-empty.png)
-- [03 展开结果与底栏](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/03-scanner-results.png)
-- [04 最小窗口结果页](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/04-scanner-minimum.png)
-- [05 扫描中状态](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/05-scanner-busy.png)
-- [06 删除确认客户区](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/06-delete-confirmation.png)
+- [01 首页](./assets/ui-baseline-2026-10-09/01-home.png)
+- [02 初始空结果与离线来源](./assets/ui-baseline-2026-10-09/02-scanner-empty.png)
+- [03 展开结果与底栏](./assets/ui-baseline-2026-10-09/03-scanner-results.png)
+- [04 最小窗口结果页](./assets/ui-baseline-2026-10-09/04-scanner-minimum.png)
+- [05 扫描中状态](./assets/ui-baseline-2026-10-09/05-scanner-busy.png)
+- [06 删除确认客户区](./assets/ui-baseline-2026-10-09/06-delete-confirmation.png)
 
 文档及截图保存在本地已忽略的 `docs/design/`，不纳入 GitHub 提交。离屏核验程序位于已忽略的 `.tools-state/ui-style-review/`，不属于应用实现。

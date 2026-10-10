@@ -1,8 +1,8 @@
-# Sims 4 Mod Doctor
+# Sims 4 Mod Sieve
 
 [![CI](https://github.com/stella-wood/Sims4ModDoctor/actions/workflows/ci.yml/badge.svg)](https://github.com/stella-wood/Sims4ModDoctor/actions/workflows/ci.yml)
 
-Sims 4 Mod Doctor 是一个面向 Windows 的本地离线《模拟人生 4》Mod 整理工具。
+Sims 4 Mod Sieve 是一个面向 Windows 的本地离线《模拟人生 4》Mod 整理工具。
 
 当前版本专注于可靠地发现并处理内容完全相同的重复文件。扫描和报告生成默认只读；只有用户明确勾选并确认后，桌面版才会把文件移入 Windows 回收站。
 
@@ -35,16 +35,16 @@ Mod 冲突检测入口目前尚未开放，当前版本不会分析 DBPF 资源�
 每次推送到 `main` 或提交 Pull Request 时，GitHub Actions 都会在 Windows 上执行锁定还原、Release 构建和普通测试。
 
 ```powershell
-.\eng\dotnet.cmd restore .\Sims4ModDoctor.sln --locked-mode
-.\eng\dotnet.cmd build .\Sims4ModDoctor.sln -c Release --no-restore --nologo
-.\eng\dotnet.cmd test .\Sims4ModDoctor.sln -c Release --no-build --no-restore --nologo
+.\eng\dotnet.cmd restore .\Sims4ModSieve.sln --locked-mode
+.\eng\dotnet.cmd build .\Sims4ModSieve.sln -c Release --no-restore --nologo
+.\eng\dotnet.cmd test .\Sims4ModSieve.sln -c Release --no-build --no-restore --nologo
 ```
 
 真实 Windows 回收站往返测试默认跳过，因为它会对自动创建的临时文件执行一次回收站删除和恢复。明确需要验证时运行：
 
 ```powershell
-$env:SIMS4_MOD_DOCTOR_RUN_RECYCLE_BIN_TEST='1'
-.\eng\dotnet.cmd test .\tests\Sims4ModDoctor.Desktop.Tests\Sims4ModDoctor.Desktop.Tests.csproj `
+$env:SIMS4_MOD_SIEVE_RUN_RECYCLE_BIN_TEST='1'
+.\eng\dotnet.cmd test .\tests\Sims4ModSieve.Desktop.Tests\Sims4ModSieve.Desktop.Tests.csproj `
   -c Release --no-build --no-restore --nologo `
   --filter 'FullyQualifiedName~UnicodeFileCanRoundTripThroughWindowsRecycleBin'
 ```
@@ -54,21 +54,21 @@ $env:SIMS4_MOD_DOCTOR_RUN_RECYCLE_BIN_TEST='1'
 ## 运行桌面版
 
 ```powershell
-.\eng\dotnet.cmd run --project .\src\Sims4ModDoctor.Desktop\Sims4ModDoctor.Desktop.csproj -c Release
+.\eng\dotnet.cmd run --project .\src\Sims4ModSieve.Desktop\Sims4ModSieve.Desktop.csproj -c Release
 ```
 
 Release 构建输出位于：
 
 ```text
-src\Sims4ModDoctor.Desktop\bin\Release\net8.0-windows\
+src\Sims4ModSieve.Desktop\bin\Release\net8.0-windows\
 ```
 
-上次使用的扫描来源保存在当前 Windows 用户的本地应用数据目录中，不会写入 Mods 文件夹。
+桌面程序名为 `Sims4ModSieve.exe`。扫描来源与错误日志保存在 `%LOCALAPPDATA%\Sims4ModSieve\`，不会写入 Mods 文件夹。新目录尚无设置时，依次读取旧版 `%LOCALAPPDATA%\Sim4ModSieve\duplicate-settings.json` 和 `%LOCALAPPDATA%\Sims4ModDoctor\duplicate-settings.json`；后续保存写入新目录，旧文件保留。
 
 ## CLI
 
 ```powershell
-.\eng\dotnet.cmd run --project .\src\Sims4ModDoctor.Cli\Sims4ModDoctor.Cli.csproj -c Release -- `
+.\eng\dotnet.cmd run --project .\src\Sims4ModSieve.Cli\Sims4ModSieve.Cli.csproj -c Release -- `
   scan-duplicates `
   --source "D:\Documents\Electronic Arts\The Sims 4\Mods" `
   --source "D:\Downloads\New Mods" `
@@ -85,13 +85,13 @@ src\Sims4ModDoctor.Desktop\bin\Release\net8.0-windows\
 
 ```text
 src/
-├─ Sims4ModDoctor.Core/          文件发现、Hash、重复分组和报告
-├─ Sims4ModDoctor.Cli/           命令行扫描与报告入口
-└─ Sims4ModDoctor.Desktop/       WPF 界面和 Windows 回收站适配
+├─ Sims4ModSieve.Core/          文件发现、Hash、重复分组和报告
+├─ Sims4ModSieve.Cli/           命令行扫描与报告入口
+└─ Sims4ModSieve.Desktop/       WPF 界面和 Windows 回收站适配
 
 tests/
-├─ Sims4ModDoctor.Core.Tests/    核心扫描与报告测试
-└─ Sims4ModDoctor.Desktop.Tests/ ViewModel、文件动作和 WPF 交互测试
+├─ Sims4ModSieve.Core.Tests/    核心扫描与报告测试
+└─ Sims4ModSieve.Desktop.Tests/ ViewModel、文件动作和 WPF 交互测试
 
 eng/
 ├─ dotnet.cmd                    统一 .NET 命令入口

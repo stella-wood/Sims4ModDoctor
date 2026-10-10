@@ -33,10 +33,10 @@ jobs:
           global-json-file: global.json
 
       - name: Restore locked dependencies
-        run: dotnet restore Sims4ModDoctor.sln --locked-mode
+        run: dotnet restore Sims4ModSieve.sln --locked-mode
 
       - name: Build Release
-        run: dotnet build Sims4ModDoctor.sln -c Release --no-restore --nologo
+        run: dotnet build Sims4ModSieve.sln -c Release --no-restore --nologo
 
       - name: Run tests
-        run: dotnet test Sims4ModDoctor.sln -c Release --no-build --no-restore --nologo
+        run: dotnet test Sims4ModSieve.sln -c Release --no-build --no-restore --nologo
