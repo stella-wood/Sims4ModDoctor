@@ -12,17 +12,13 @@
 
 视觉来源：
 
-- [App.xaml](D:/Projects/Sims4ModDoctor/src/Sims4ModDoctor.Desktop/App.xaml)：颜色、字体、按钮、卡片、展开组件及品牌图形资源。
-- [MainWindow.xaml](D:/Projects/Sims4ModDoctor/src/Sims4ModDoctor.Desktop/MainWindow.xaml)：页面结构、尺寸、局部样式与绑定。
-- [DeleteConfirmationWindow.xaml](D:/Projects/Sims4ModDoctor/src/Sims4ModDoctor.Desktop/DeleteConfirmationWindow.xaml)：紧凑确认窗。
-- [MainWindowViewModel.cs](D:/Projects/Sims4ModDoctor/src/Sims4ModDoctor.Desktop/ViewModels/MainWindowViewModel.cs)、[DuplicateResultSession.cs](D:/Projects/Sims4ModDoctor/src/Sims4ModDoctor.Desktop/ViewModels/DuplicateResultSession.cs)：状态、选择及结果会话。
-- [AGENT.md](D:/Projects/Sims4ModDoctor/AGENT.md)：此前已确认的视觉尺度、操作语义及局部改动边界。
+- [App.xaml](../../src/Sims4ModDoctor.Desktop/App.xaml)：颜色、字体、按钮、卡片、展开组件及品牌图形资源。
+- [MainWindow.xaml](../../src/Sims4ModDoctor.Desktop/MainWindow.xaml)：页面结构、尺寸、局部样式与绑定。
+- [DeleteConfirmationWindow.xaml](../../src/Sims4ModDoctor.Desktop/DeleteConfirmationWindow.xaml)：紧凑确认窗。
+- [MainWindowViewModel.cs](../../src/Sims4ModDoctor.Desktop/ViewModels/MainWindowViewModel.cs)、[DuplicateResultSession.cs](../../src/Sims4ModDoctor.Desktop/ViewModels/DuplicateResultSession.cs)：状态、选择及结果会话。
+- `AGENTS.md`（作者本机，未提交）：此前已确认的视觉尺度、操作语义及局部改动边界。
 
-本地桌面源码基线为 `55f99c2`；与本轮内容比较修复 `9910fb8` 中的 Desktop 源码比较无差异。本文不是对整个本地 main 已同步的声明。
-
-使用当前 XAML、样式及 ViewModel，以虚构的 `C:\Demo\…` 路径和样例结果进行 WPF 离屏渲染，覆盖默认窗口 1180×780 与最小窗口 920×640。未扫描或删除真实 Mod，未写入个人设置。截图仅展示 WPF 内容区，不包含系统标题栏；实际输出分别为 1166×743、906×603，不能拿截图像素反推窗口外框尺寸。
-
-本次核验覆盖静态布局和模拟状态；不等于已经验证所有 DPI、键盘导航、系统主题和大量真实数据的表现。错误 MessageBox 的内容与调用方式通过代码确认，未截图。
+截图用虚构路径和样例数据离屏渲染，覆盖默认窗口 1180×780 与最小窗口 920×640，只含内容区、不含系统标题栏。未验证不同 DPI、键盘导航和系统主题。
 
 ## 2. 整体气质
 
@@ -70,7 +66,7 @@
 
 窗口变宽时，内容和卡片舒展；字体、图标和按钮字号不随整页同比放大。不要用整页 Viewbox 代替响应布局。
 
-![首页现状](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/01-home.png)
+![首页现状](assets/ui-baseline-2026-10-09/01-home.png)
 
 ### 3.3 工作页
 
@@ -97,7 +93,7 @@
 - 来源列表与结果列表各自滚动。结果列表不显示水平滚动条，较长路径省略并提供 Tooltip。
 - 保留结果列表虚拟化与 Recycling；不要换成一次渲染全部大数据的长 StackPanel。
 
-![重复检测结果现状：虚构数据](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/03-scanner-results.png)
+![重复检测结果现状：虚构数据](assets/ui-baseline-2026-10-09/03-scanner-results.png)
 
 ## 4. 颜色规范
 
@@ -243,7 +239,7 @@
 - 「内容不同」不写成「有害冲突」「导致报错」或「必须删除」。不从资源覆盖差异推导加载顺序和保留建议。
 - 路径操作优先使用定位文件、复制路径等辅助动作；重复检测的勾选删除、可清理大小与撤回栏不能机械复制到冲突结果。
 - 文件已变化、超出限制、压缩方式不支持等放在相关失败项下，摘要简短、详情可展开。
-- 首页冲突卡片开放时移除禁用表现，替换「尚未开放」；介绍文字须覆盖实际功能，不能沿用当前包含“文件健康与运行报错”的超前描述。
+- 首页冲突卡片开放时移除禁用表现，替换「尚未开放」；介绍文字只写已经上线的子功能。
 
 ## 9. 发现的问题与改进建议
 
@@ -256,7 +252,7 @@
 | BareIconButton 与展开 ToggleButton 取消了 FocusVisualStyle | 在不改变常态视觉的前提下补键盘焦点提示与可访问名称，验证 Tab/Space/Enter |
 | 10–11 号路径和标签较密，淡紫色辅助文字对比偏弱 | 先测 125% / 150% DPI 与长路径；用户已指定的「更改」样式保持原值，调整前再确认 |
 | 移除来源按钮、复选框、滚动条和错误框仍部分依赖系统样式 | 跨 Windows 主题验证，不把本次机器的原生外观写成品牌 Token |
-| 首页冲突卡片包含尚未开放的能力描述 | 开放入口时同步更新为准确的资源比较说明 |
+| 首页冲突卡片包含尚未开放的能力描述 | 开放入口时只写已上线的子功能 |
 
 ## 10. 实现与验收清单
 
@@ -277,11 +273,10 @@
 
 截图均为现有 XAML 加虚构数据的离屏渲染。文字和样例路径用于布局核验，不是玩家真实扫描记录。确认窗截图仅含客户区，原生无文字标题栏需结合 XAML 规格理解。
 
-- [01 首页](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/01-home.png)
-- [02 初始空结果与离线来源](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/02-scanner-empty.png)
-- [03 展开结果与底栏](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/03-scanner-results.png)
-- [04 最小窗口结果页](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/04-scanner-minimum.png)
-- [05 扫描中状态](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/05-scanner-busy.png)
-- [06 删除确认客户区](D:/Projects/Sims4ModDoctor/docs/design/assets/ui-baseline-2026-10-09/06-delete-confirmation.png)
+- [01 首页](assets/ui-baseline-2026-10-09/01-home.png)
+- [02 初始空结果与离线来源](assets/ui-baseline-2026-10-09/02-scanner-empty.png)
+- [03 展开结果与底栏](assets/ui-baseline-2026-10-09/03-scanner-results.png)
+- [04 最小窗口结果页](assets/ui-baseline-2026-10-09/04-scanner-minimum.png)
+- [05 扫描中状态](assets/ui-baseline-2026-10-09/05-scanner-busy.png)
+- [06 删除确认客户区](assets/ui-baseline-2026-10-09/06-delete-confirmation.png)
 
-文档及截图保存在本地已忽略的 `docs/design/`，不纳入 GitHub 提交。离屏核验程序位于已忽略的 `.tools-state/ui-style-review/`，不属于应用实现。
