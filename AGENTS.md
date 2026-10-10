@@ -1,284 +1,157 @@
-# Sims 4 Mod Sieve｜Agent 协作指南
+# Sims 4 Mod Sieve · Agent 指南
 
 正式产品名称为 `Sims 4 Mod Sieve`；工程目录、命名空间、程序集和可执行文件使用 `Sims4ModSieve`。
 
-本文约束后续接手本项目的 Agent。目标不是让代码显得“完整”，而是在不破坏现有产品判断的前提下，持续交付可验证、可维护、不过度设计的功能。
+Windows 本地离线的《模拟人生 4》Mod 整理工具，.NET 8 + WPF。
 
-## 1. 权威顺序与开始工作前的阅读
+## 1. 以什么为准
 
-遇到冲突时，按以下顺序判断：
+冲突时按顺序：
 
-1. 用户当前明确表达的需求与纠正
-2. 磁盘上正在运行的代码与测试
-3. 本文件记录的稳定实现约束
+1. 用户当前的要求和纠正
+2. 仓库里的代码与测试
+3. 本文件
 4. `docs/product/产品需求文档.md`
-5. `docs/architecture/架构方案-v3.md`
-6. v2、调研稿与 spikes
+5. `docs/architecture/架构方案-v3.md`、`docs/design/UI设计风格规范-v1.md`
+6. `docs/archive/`、`docs/research/`
 
-开始修改前必须：
+## 2. 工作方式
 
-- 读取相关代码的当前版本，不凭旧截图或旧对话猜实现
-- 检查工作树，保留用户和其他 Agent 的已有修改
-- 先确定用户指出的具体对象、状态与影响范围
-- 需求若只涉及一个位置，不擅自扩大为全局规则
+- 一次只做指定的一项任务，做完停下汇报。不顺手做下一项，不顺手重构。
+- 动手前用一两句话说明要改哪些文件、大概多少改动；明显超出任务时先问。
+- 用户给了文件或路径，就直接打开，不全仓库搜索。不为「了解项目」通读仓库。
+- 开始前看工作树，保留用户和其他 Agent 未提交的修改。
+- 用户只说了一处，就只改那一处，不自行推广成全局规则。
+- 汇报写：改了哪些文件、跑了哪些测试、结果、哪些没验证。
 
-### 1.1 工作范围与节省额度
+## 3. 写代码
 
-- 一次只做用户指定的那一项任务。做完就停下汇报，不顺手做清单里的下一项，不顺手重构无关代码
-- 先看下面第 2.1 节的项目地图，直接打开相关目录；用户已经给出文件或路径时，不再全仓库搜索
-- 不为了「了解项目」通读整个仓库；只读本次任务涉及的文件，以及它们直接依赖的接口
-- 改动前先用一两句话说明打算改哪些文件；范围明显超出任务时先问，不要先做
-- 汇报写清：改了哪些文件、跑了哪些测试、结果如何、哪些没验证
+- 改动尽量小，只改任务需要的地方。跟着周围代码的命名、写法和注释密度走。
+- 防御只放在真正不可信的边界：读文件、解析 package／zip／日志、用户输入。内部调用之间不为不可能发生的情况加检查。
+- 不新建抽象、接口或工具类，除非同样的代码已经出现三次。
+- 不留注释掉的代码，不写复述代码本身的注释。注释只写「为什么」。
+- 改了行为，同一个提交里更新相关文档（README、`docs/`、各项目 README）。
 
-## 2. 当前产品事实
+## 4. 写文档
 
-这是 Windows 本地离线的《模拟人生 4》Mod 诊断工具，基于 .NET 8 与 WPF。
+文档写给开发者看：
 
-已经完成（重复文件检测，界面完整）：
+- 写这个功能做什么、规则是什么、现在做到哪。
+- 不写全文摘要、不写给文档自己的验收标准、不写替自己免责的句子。
+- 同一条规则只在一个地方写，其他地方链接过去。
+- 链接用仓库内相对路径，不写本机绝对路径。
 
-- 多目录重复文件扫描
-- 父目录与显式子目录的去重遍历
-- 跳过 reparse point
-- 按大小分桶与流式 SHA-256
-- hash 前后稳定性校验与一次重试
-- 稳定的重复组与建议保留规则
-- WPF 首页、扫描范围、进度、取消、结果与选择交互
-- 单文件、按组、一键建议、清空选择
-- 全部展开/收起
-- Windows 回收站删除、删除前复核、部分失败、最近一次撤回
-- JSON 与 HTML 报告 CLI
+## 5. 当前状态
 
-已经完成（冲突检测底层，只有 Core / Packages，没有界面）：
+- 重复文件检测：界面完整（扫描、选择、回收站删除、撤回、CLI 报告）。
+- 冲突检测：底层完成，没有界面。
+  - `Packages`：只读 DBPF 索引与结构预检
+  - `Core/Conflicts`：同一 TGI 的候选冲突，资源内容读取、解压与哈希比较（未压缩、zlib；RefPack 返回结构化失败）
+  - `Core/Scripts`：`.ts4script` 模块同名碰撞
+- 未做：冲突检测界面、报错诊断、二分排查、禁用、设置页内容、打包发布。
 
-- PR #1：只读 DBPF 索引读取与结构预检（`Sims4ModSieve.Packages`，见其 README）
-- PR #2：同一 TGI 出现在多个 package 的候选冲突扫描（`Core/Conflicts/PackageConflictScanner`）
-- PR #3：候选资源的受限读取、解压与内容哈希比较（`Core/Conflicts/ResourceContentComparer`、`Packages/DbpfResourceContentHasher`）；支持未压缩与 zlib，RefPack 返回结构化失败
-- PR #4（审查中，合并前以磁盘代码为准）：`.ts4script` 脚本模块碰撞扫描（`Core/Scripts/ScriptModuleScanner`）
+首页和导航里灰色的「尚未开放」不是已完成的功能。
 
-尚未完成：
-
-- 冲突检测界面（首页卡片与导航仍为灰色「尚未开放」）
-- 报错日志分析、二分排查、健康检查
-- 缓存层
-- 设置页（按钮在，内容空）
-- 发布安装包 / 自动打包
-
-不要把灰色入口、需求文档或 spike 写成已完成功能。
-
-### 2.1 项目地图
+## 6. 项目地图
 
 ```text
-Sims4ModSieve.sln
-├─ src/
-│  ├─ Sims4ModSieve.Core/        业务逻辑，不依赖 WPF，也不引用任何第三方 package 库
-│  │  ├─ Duplicates/              重复扫描、建议保留（DuplicateSelectionService）、来源发现与路径规则
-│  │  ├─ Conflicts/               TGI 候选冲突扫描、资源内容比较、处理预算
-│  │  ├─ Scripts/                 .ts4script 模块碰撞（PR #4）
-│  │  ├─ Packages/                DBPF 预检与读取接口（IPackageIndexReader）
-│  │  └─ Reporting/               JSON / HTML 报告
-│  ├─ Sims4ModSieve.Packages/    唯一引用 LlamaLogic.Packages 的项目；索引读取 + 自写的资源内容读取
-│  ├─ Sims4ModSieve.Desktop/     WPF 界面：MainWindow.xaml、ViewModels/、Services/（回收站、设置、日志）
-│  └─ Sims4ModSieve.Cli/         命令行报告
-├─ tests/
-│  ├─ Sims4ModSieve.Core.Tests/      Core 单元测试（Linux 也能跑）
-│  ├─ Sims4ModSieve.Packages.Tests/  DBPF 读取与真实样本测试
-│  ├─ Sims4ModSieve.Desktop.Tests/   WPF 交互、命中区域、回收站（只能在 Windows 跑）
-│  └─ fixtures/                       小型测试文件
-├─ eng/dotnet.cmd                 固定 SDK 的 dotnet 包装
-└─ .github/workflows/ci.yml       Windows CI
+src/
+├─ Sims4ModSieve.Core/        业务逻辑，不依赖 WPF；第三方只用 SharpZipLib
+│  ├─ Duplicates/              重复扫描、建议保留、来源发现与路径规则
+│  ├─ Conflicts/               TGI 候选冲突、资源内容比较、处理预算
+│  ├─ Scripts/                 .ts4script 模块碰撞
+│  ├─ Packages/                DBPF 预检与读取接口
+│  └─ Reporting/               JSON / HTML 报告
+├─ Sims4ModSieve.Packages/    唯一引用 LlamaLogic.Packages；索引读取 + 自写资源内容读取
+├─ Sims4ModSieve.Desktop/     WPF：MainWindow.xaml、ViewModels/、Services/
+└─ Sims4ModSieve.Cli/         命令行报告
+tests/
+├─ Sims4ModSieve.Core.Tests/      Linux 也能跑
+├─ Sims4ModSieve.Packages.Tests/  含真实样本测试
+├─ Sims4ModSieve.Desktop.Tests/   只能在 Windows 跑（STA）
+└─ fixtures/
 ```
 
-真实样本测试默认跳过，设置环境变量 `SIMS4_MOD_SIEVE_REAL_MODS=<Mods 路径>` 后运行（`--filter TestCategory=RealCorpus`）。
-需求文档与架构方案在作者本机 `docs/`，未进仓库；仓库里没有时以本文件和磁盘代码为准。
+真实样本测试默认跳过。设置 `SIMS4_MOD_SIEVE_REAL_MODS=<Mods 路径>` 后用 `--filter TestCategory=RealCorpus` 运行。
 
-## 3. 不可复制的业务规则
+## 7. 不能改动的业务规则
 
-### 3.1 重复副本建议
+### 7.1 建议保留
 
-`Sims4ModSieve.Core.Duplicates.DuplicateSelectionService` 是建议保留/删除策略的唯一权威：
+`Core/Duplicates/DuplicateSelectionService` 是唯一权威：Mods 内优先 → 目录更深优先 → 稳定路径顺序。一键勾选和组勾选都调用它，不在 ViewModel、code-behind 或删除服务里另写判断。
 
-1. Mods 内部优先保留
-2. 同一范围内目录层级更深者优先
-3. 仍并列时按稳定路径顺序选择
+组复选框显示选中的两种情况：当前选择等于建议删除集合；或用户手动选中了整组。用户选中整组时不要自动取消组复选框。
 
-全局“一键勾选”和组级勾选必须调用同一份建议结果。不要在 ViewModel、XAML code-behind 或删除服务里重写判断。
-
-UI 中建议保留项排在组内第一项展示，但不得改变 Core 的文件身份或 hash 结果。
-
-### 3.2 组级选择状态
-
-组复选框为选中状态的两种合法情况：
-
-- 当前选择与 Core 的建议删除集合完全一致
-- 用户手动选中了该组全部文件
-
-不要因为用户选择“全部删除”就自动取消组复选框。用户可以覆盖建议。
-
-### 3.3 删除与撤回
-
-删除链路必须保持：
+### 7.2 删除与撤回
 
 ```text
-ViewModel
-  → IFileActionService
-    → IRecycleBinAdapter
-      → Windows IFileOperation
+ViewModel → IFileActionService → IRecycleBinAdapter → Windows IFileOperation
 ```
 
-- UI 事件处理器不得直接调用文件删除 API
-- 只处理用户当前明确勾选的真实文件
-- 执行前再次核对长度与最后修改时间
-- 只支持可靠的 Windows 回收站语义；不得退化为永久删除
-- 部分成功必须与部分失败分别报告
-- 撤回只覆盖最近一次批量删除
-- 恢复时原路径已有同名文件，绝不覆盖
-- 删除成功后重建当前重复组，建议策略仍调用 `DuplicateSelectionService`
+- UI 事件里不直接调用删除 API；只删用户当前勾选的真实文件。
+- 执行前再核对长度和修改时间；不支持回收站时不退化为永久删除。
+- 部分成功和部分失败分别报告。
+- 撤回只针对最近一次批量删除；原路径已有同名文件时绝不覆盖。
+- 删除后重建当前重复组，建议仍由 `DuplicateSelectionService` 给出。
 
-删除确认窗是意图确认，不是说明页。当前批准的交互为：
+确认窗：标题栏无文字，正文只有 `确定删除所选文件？`，按钮只有 `否`、`是`。不要把数量、大小、路径、回收站或撤回说明加回去；预检在后台做，失败了再说明。
 
-- 原生标题栏不显示文字
-- 正文只显示 `确定删除所选文件？`
-- 按钮只显示 `否` 与 `是`
-- 弹窗保持紧凑
+### 7.3 结果会话
 
-文件数量、大小、完整路径、回收站说明、撤回说明和整组警告不得擅自重新塞回确认窗。预检仍在后台执行；只有失败时才告诉用户具体问题。
+| 事件 | 结果 |
+|---|---|
+| 来源列表清空 | 清空结果、选择、扫描状态、删除提示、撤回记录 |
+| 开始新扫描 | 新建会话替换旧会话 |
+| 新增、移除部分、启停来源 | 保留现有结果 |
+| 扫描进行中 | 锁定来源复选框 |
+| 返回首页再进入 | 保留现有结果 |
 
-## 4. 结果会话与联动边界
+新增带状态的功能，接入现有会话生命周期，不在各个按钮旁边各养一套布尔变量。
 
-扫描范围、扫描结果、选择状态、删除提示和撤回记录属于同一条结果会话，但“联动”不等于任何变化都清空一切。
+## 8. 界面
 
-当前批准的规则只有：
+视觉、尺寸、颜色、字体见 `docs/design/UI设计风格规范-v1.md`。最常被改坏的几条：
 
-- 左侧来源列表变为空：清空右侧结果、选择、扫描状态、删除提示与撤回记录
-- 用户开始新扫描：建立新结果会话，并替换旧会话
-- 新增目录：保留现有结果
-- 移除部分目录：保留现有结果
-- 启用或停用目录：保留现有结果
-- 扫描进行中：锁定来源复选框，避免扫描输入与页面状态错位
+- 气质：克制、温暖、清楚，有工具感。不用默认蓝、大圆角、大面积渐变或玻璃效果。
+- 文案用短语，按钮不加句号，不写防御性说明，不把标题、按钮和提示重复说三遍。
+- 完整路径必须含文件名，可以截断显示，Tooltip 给全文。
+- 首页随窗口舒展，字号和图标不放大；不用 Viewbox 整页缩放。
+- 图标自绘矢量，不用 emoji 或 Unicode 方块。图标视觉尺寸和点击热区分开：图标 `IsHitTestVisible=false`，矩形宿主负责命中（批量展开按钮：图标 16×16，热区 24×24）。改命中后运行 `BareIconButtonHitTests`。
 
-不要把新增、部分移除或启停目录擅自解释为“旧结果必须立刻失效”。用户可以先调整范围，再决定何时重扫。
+## 9. WPF 已知陷阱
 
-新增任何带状态的功能前，先列出它与下列事件的关系：
+1. 改相似 Style 时补丁要带准确的 `x:Key`。曾经改到了 `HeaderNavButtonStyle`，要改的 `BareIconButtonStyle` 没变。
+2. 无背景的 `ContentPresenter` 只让 Path 参与命中，热区要用明确的矩形宿主。
+3. `Run.Text` 绑定只读属性必须 `Mode=OneWay`，否则确认窗布局时抛 `InvalidOperationException`。
+4. WPF 测试要 STA；一个进程里不要反复创建 `Application`。
+5. 运行中的应用会锁 EXE／DLL，先关掉再构建。
 
-- 首次进入页面
-- 开始、取消、失败、完成扫描
-- 来源新增、移除、清空、启停
-- 单项、整组与批量选择
-- 删除成功、部分失败、撤回成功、部分恢复
-- 返回首页再进入
+## 10. 完成标准
 
-状态应接入现有生命周期入口，不要在不同按钮旁各养一套互不相识的布尔变量。
+- 改在正确的控件和代码路径上，没有扩大范围。
+- 编译 0 警告 0 错误，相关测试通过。
+- 高风险操作只用临时文件验证，不碰真实 Mods。
+- 界面改动要实际启动看过。点击区域、渲染、删除与撤回要有行为证据，编译通过不算完成。
 
-## 5. 界面与文字尺度
-
-设计目标是：克制、温暖、精准、有工具感，但不冷。
-
-稳定视觉基线：
-
-- 页面底色：`#F6F5F2`
-- 卡片：白色
-- 主强调紫：`#6F5A91`
-- 展开文件区：`#F3F1ED`
-- 当前 Mods 提示区：`#EAE7E2`
-- 分组虚线应可感知但不抢眼
-- 大面积避免纯冷白、默认蓝和过度圆角
-
-字体角色不能混成一种：
-
-- 品牌：Bahnschrift
-- 展示标题：等线
-- 功能标题与按钮：Microsoft YaHei UI
-- 数据、路径与轻量统计：Segoe UI Variable Text / 等线
-
-文字规则：
-
-- 标签和说明不写需求文档式长句
-- 能用准确短语解决，就不补一段防御性解释
-- 按钮说明通常不加句号
-- 不重复表达页面标题、按钮动作与安全提示
-- 不用“为了让用户放心”作为增加信息的默认理由
-- 完整文件路径必须包含文件名；可以视觉截断，但 Tooltip 保留全文
-
-主页响应规则：
-
-- 内容区随窗口横向扩展
-- 卡片宽高按既定比例变化
-- 字号与图标尺寸保持不变
-- 卡片内部使用比例分区，让图标、文字和按钮位置随卡片舒展
-- 不使用 Viewbox 把整页当海报同比放大
-
-结果页保持：
-
-- 顶部导航稳定
-- 左右工作区约 31:69
-- 左侧只管理范围与扫描状态
-- 右侧承担结果浏览与文件动作
-
-## 6. 图标与点击区域
-
-- 优先使用项目自绘的轻量矢量图标，不随意塞 emoji 或系统 Unicode 方块
-- 批量展开/收起使用三条“手风琴线”，状态通过线距区分
-- 图标视觉尺寸与点击热区分离
-- 当前批量展开按钮：图标 `16×16`，命中区 `24×24`
-- 图标层 `IsHitTestVisible=false`，完整矩形宿主负责命中
-- 裸图标按钮的宿主背景与所在表面同色；视觉上无底色，但不能使用只有 Path 才命中的空模板
-
-修改命中行为后，必须运行 `BareIconButtonHitTests`。不要只看 XAML 就宣布“整块可点”。
-
-## 7. WPF 已知陷阱
-
-1. 修改相似 Style 时，补丁必须带上准确的 `x:Key` 上下文。曾经因为通用模板片段命中了 `HeaderNavButtonStyle`，实际要改的 `BareIconButtonStyle` 完全没变。
-2. 无背景的 `ContentPresenter` 可能只让可绘制 Path 参与命中。命中区域需要明确的矩形宿主。
-3. `Run.Text` 绑定只读 ViewModel 属性时必须显式 `Mode=OneWay`。默认双向绑定曾导致确认窗口布局时抛出 `InvalidOperationException` 并终止应用。
-4. WPF 测试需要 STA。一个测试进程中不要反复创建 `Application`；命中与弹窗渲染应放在同一离屏 WPF 测试中。
-5. 正在运行的应用可能锁定 EXE/DLL。优先正常关闭；若无法关闭，可用项目内临时输出验证，但最终必须回写正式构建并清理临时目录。
-
-## 8. 完成标准
-
-“改完”至少意味着：
-
-- 修改落在正确控件和正确代码路径
-- 行为与用户描述一致，没有擅自扩大范围
-- 编译 0 警告、0 错误
-- 相关测试通过
-- 高风险操作使用隔离临时文件验证，不碰真实 Mods
-- GUI 修改实际启动后再交付
-
-不要因为 `apply_patch` 成功或编译通过就宣布用户可见问题已经解决。点击区域、窗口渲染、删除与撤回都需要对应的行为证据。
-
-## 9. 常用命令
+## 11. 常用命令
 
 ```powershell
-# 构建
 .\eng\dotnet.cmd build .\Sims4ModSieve.sln -c Release --no-restore --nologo
-
-# 完整测试
-.\eng\dotnet.cmd test .\Sims4ModSieve.sln -c Release --no-restore --nologo
-
-# 仅桌面交互测试
-.\eng\dotnet.cmd test .\tests\Sims4ModSieve.Desktop.Tests\Sims4ModSieve.Desktop.Tests.csproj `
-  -c Release --no-restore --nologo
-
-# 明确授权后运行真实回收站往返测试；只使用自动创建的临时中文文件
-$env:SIMS4_MOD_SIEVE_RUN_RECYCLE_BIN_TEST='1'
-.\eng\dotnet.cmd test .\tests\Sims4ModSieve.Desktop.Tests\Sims4ModSieve.Desktop.Tests.csproj `
-  -c Release --no-build --no-restore --nologo `
-  --filter 'FullyQualifiedName~UnicodeFileCanRoundTripThroughWindowsRecycleBin'
-
-# 运行桌面版
+.\eng\dotnet.cmd test  .\Sims4ModSieve.sln -c Release --no-restore --nologo
 .\eng\dotnet.cmd run --project .\src\Sims4ModSieve.Desktop\Sims4ModSieve.Desktop.csproj -c Release
 ```
 
-## 10. 代码来源
+真实回收站往返测试见 README。
 
-- 第三方代码只按其许可证使用；DBPF 格式参考 LlamaLogic（MIT），来源已写在 `THIRD-PARTY-NOTICES.md`
-- 格式规则以源码或规范为依据；真实样本只能证伪，不能证明规则恒真（样本里没见过某种值，不代表不存在）
+## 12. 代码来源
 
-## 11. 与用户协作
+- 第三方代码只按许可证使用，来源写进 `THIRD-PARTY-NOTICES.md`。
+- 格式规则以源码或规范为依据。真实样本只能证伪：样本里没见过某个值，不代表它不存在。
 
-- 用户说“这个颜色”“这个位置”时，先以截图标注和最近一句为准，明确是背景、文件区、按钮还是文字
-- 用户纠正范围后立即放弃旧假设，不继续替旧方案辩护
-- 少写“更安全、更完整”的自我解释；先交付她真正要求的尺度
-- 不让用户反复承担点击、截图和定位本应由自动测试完成的问题
-- 可以提出判断，但不得用架构或规范压过用户明确的产品决定
-- 用户的苛刻不是噪音；真正需要避免的是 Agent 未验证便报告成功，以及从一次纠正跳到另一个极端
+## 13. 与用户协作
+
+- 用户说「这个颜色」「这个位置」，以截图标注和最近一句为准，先弄清是背景、文件区、按钮还是文字。
+- 用户纠正后立刻放弃旧方案，不替它辩护，也不跳到另一个极端。
+- 可以提判断，但不用架构或规范压过用户明确的产品决定。
+- 不让用户反复点击、截图来定位本该由自动测试发现的问题。
+- 没验证过的，不报告成已完成。
