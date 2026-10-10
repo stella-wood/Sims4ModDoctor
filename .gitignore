@@ -7,8 +7,6 @@ artifacts/
 TestResults/
 
 # Internal planning and experiments
-AGENT.md
-docs/
 spikes/
 
 # IDE and per-user settings
