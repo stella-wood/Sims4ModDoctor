@@ -2,7 +2,7 @@ namespace Sims4ModDoctor.Core.Scripts;
 
 /// <summary>
 /// 脚本归档分析的安全上限。.ts4script 来自网上，按不可信输入处理：
-/// 条目数在构造 <see cref="System.IO.Compression.ZipArchive"/> 之前就从中央目录尾部读出并检查；
+/// 有界遍历中央目录，在分配下一条记录前检查实际条目数量，并核对尾部声明；
 /// 条目内容按实际解压输出的字节计数，不信任 zip 里声明的长度。
 /// </summary>
 /// <param name="MaxArchiveBytes">单个 .ts4script 文件的体积上限。</param>

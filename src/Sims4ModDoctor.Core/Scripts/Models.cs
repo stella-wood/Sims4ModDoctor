@@ -95,6 +95,10 @@ public static class ScriptArchiveIssueCode
     public const string EntryCorrupt = "script-entry-corrupt";
     public const string EntrySizeExceedsLimit = "script-entry-size-exceeds-limit";
 
+    public const string PycUnsupported = "script-pyc-unsupported";
+    public const string PycStale = "script-pyc-stale";
+    public const string PycTimestampUnknown = "script-pyc-timestamp-unknown";
+
     public const string BudgetExhausted = "script-scan-budget-exhausted";
 
     public const string UnexpectedError = "script-archive-unexpected-error";
@@ -103,10 +107,12 @@ public static class ScriptArchiveIssueCode
 /// <summary>
 /// 某个模块名在某个归档里的一次出现。
 /// </summary>
-/// <param name="EntryName">zipimport 实际会加载的那个条目（同名时按查找顺序选中的）。</param>
+/// <param name="EntryName">按 Python 3.7 默认 zipimport 头部规则选出的静态候选；失败时为未能比较的条目。</param>
 /// <param name="Sha256">
-/// 模块内容的 SHA-256，大写十六进制。.pyc 跳过开头 16 字节的头部再算，
-/// 见 <see cref="ScriptModuleScanner"/> 的说明。读取失败时为 <see langword="null"/>。
+/// 带内容格式标识的 SHA-256，大写十六进制。支持的 Python 3.7 .pyc 验证 flags 并保留 magic，
+/// 不比较已接受头部的缓存验证元数据；源码按原始字节比较。
+/// 哈希相同仅表示这种静态字节比较相同，不证明代码可执行或运行效果相同。
+/// 读取失败或候选无法确定时为 <see langword="null"/>。
 /// </param>
 /// <param name="ContentLength">实际解压输出的字节数（不扣除跳过的头部），不是 zip 里的声明值。</param>
 public sealed record ScriptModuleOccurrence(

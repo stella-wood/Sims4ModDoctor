@@ -10,7 +10,8 @@
 
 - `LlamaLogic.Packages` 3.8.2 — MIT — https://github.com/Llama-Logic/LlamaLogic
 - `SharpZipLib` 1.4.2 — MIT — https://github.com/icsharpcode/SharpZipLib
-  （用于有界流式 zlib 解压及显式结束状态校验；原本也由 LlamaLogic 传递引入。）
+  （Packages 用于有界流式 zlib 解压；Core 用于脚本 ZIP 的有界 DEFLATE 解压、结束状态及 CRC 校验。
+  原本也由 LlamaLogic 传递引入，版本未变，第三方类型不暴露在公开扫描接口中。）
 
 ### 传递依赖
 

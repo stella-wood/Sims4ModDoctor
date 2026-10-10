@@ -16,10 +16,11 @@ public sealed class ScriptModuleScannerTests
     private static ScriptModuleScanRequest Request(string mods, ScriptModuleLimits? limits = null) =>
         new([new ScanSource("mods", mods, Label: "Mods")], limits);
 
-    private static byte[] Pyc(string body, uint sourceMtime = 0x5F000000)
+    private static byte[] Pyc(string body, uint sourceMtime = 0x5F000000, uint flags = 0)
     {
         var header = new byte[16];
         Py37Magic.CopyTo(header, 0);
+        BitConverter.GetBytes(flags).CopyTo(header, 4);
         BitConverter.GetBytes(sourceMtime).CopyTo(header, 8);
         return [.. header, .. System.Text.Encoding.UTF8.GetBytes(body)];
     }
@@ -80,17 +81,20 @@ public sealed class ScriptModuleScannerTests
     }
 
     [TestMethod]
-    public async Task HeaderIsHashedWhenItDoesNotLookLikePyc()
+    public async Task InvalidBytecodeHeadersAreUncompared()
     {
         using var temp = new TempDirectory();
         var mods = temp.CreateDirectory("Mods");
-        // 16 字节以上、但第 3、4 字节不是 \r\n：不像 .pyc 头部，整份参与哈希。
+        // Invalid magic cannot establish a successful comparison, even with differing bytes.
         WriteScript(temp, "Mods/a.ts4script", ("m.pyc", "AAAAAAAAAAAAAAAA-same"u8.ToArray()));
         WriteScript(temp, "Mods/b.ts4script", ("m.pyc", "BBBBBBBBBBBBBBBB-same"u8.ToArray()));
 
         var report = await CreateScanner().ScanAsync(Request(mods));
 
-        Assert.AreEqual(ScriptModuleVerdict.Different, report.Collisions.Single().Verdict);
+        var collision = report.Collisions.Single();
+        Assert.AreEqual(ScriptModuleVerdict.Incomplete, collision.Verdict);
+        Assert.AreEqual(2, collision.Uncompared.Count);
+        Assert.AreEqual(0, collision.ContentGroups.Count);
     }
 
     [TestMethod]
@@ -126,8 +130,8 @@ public sealed class ScriptModuleScannerTests
         WriteScript(temp, "Mods/a.ts4script",
             ("lib.pyc", Pyc("module form")),
             ("lib/__init__.py", "source form"u8.ToArray()),
-            ("lib/__init__.pyc", Pyc("package form")));
-        WriteScript(temp, "Mods/b.ts4script", ("lib/__init__.pyc", Pyc("package form")));
+            ("lib/__init__.pyc", Pyc("package form", flags: 1)));
+        WriteScript(temp, "Mods/b.ts4script", ("lib/__init__.pyc", Pyc("package form", flags: 1)));
 
         var report = await CreateScanner().ScanAsync(Request(mods));
 

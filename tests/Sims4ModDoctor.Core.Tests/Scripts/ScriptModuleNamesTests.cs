@@ -23,7 +23,11 @@ public sealed class ScriptModuleNamesTests
                 foreach (var name in entryNames)
                 {
                     using var stream = zip.CreateEntry(name).Open();
-                    stream.Write("x"u8);
+                    // Valid supported bytecode keeps these tests focused on path parsing.
+                    byte[] content = name.EndsWith(".pyc", StringComparison.Ordinal)
+                        ? [0x42, 0x0D, 0x0D, 0x0A, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte)'x']
+                        : [(byte)'x'];
+                    stream.Write(content);
                 }
             }
             temp.WriteBytes($"Mods/{archive}.ts4script", memory.ToArray());

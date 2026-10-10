@@ -1,13 +1,14 @@
 namespace Sims4ModDoctor.Core.Scripts;
 
 /// <summary>
-/// 把 zip 条目名换算成 Python 能 import 的模块名，规则按 zipimport 的查找方式。
+/// 静态换算 zip 条目名与 Python 模块名，候选顺序按 Python 3.7 zipimport。
 /// </summary>
 /// <remarks>
 /// <para>游戏把每个 .ts4script 当作 zip 加进 import 路径，由 zipimport 加载。
 /// 对模块 <c>a.b</c>，zipimport 在归档里依次找
-/// <c>a/b/__init__.pyc</c>、<c>a/b/__init__.py</c>、<c>a/b.pyc</c>、<c>a/b.py</c>，用第一个找到的。
-/// 所以同一个归档里一个模块名只对应一个条目，优先级见 <see cref="ScriptModuleEntry.Priority"/>。</para>
+/// <c>a/b/__init__.pyc</c>、<c>a/b/__init__.py</c>、<c>a/b.pyc</c>、<c>a/b.py</c>。
+/// 无效 magic、默认检查模式不接受的 flags 或过期时间戳会使其继续尝试下一个候选；
+/// 本分析只检查头部与内容字节，不证明源码或 marshal 数据能被 Python 加载。</para>
 /// <para>zipimport 不查 <c>__pycache__</c>，那里的 .pyc 不会被 import，这里也不算模块。
 /// 查找按条目名精确匹配，区分大小写，所以 <c>.PYC</c> 不算。</para>
 /// </remarks>
@@ -17,6 +18,32 @@ internal static class ScriptModuleNames
     private const string SourceSuffix = ".py";
     private const string PackageInit = "__init__";
     private const string PyCache = "__pycache__";
+
+    /// <summary>
+    /// 中央目录中的同路径条目最后一个生效（Python 的字典覆盖语义），再按模块查找顺序分组。
+    /// 保留所有候选，读取头部后才决定是否继续查找源码。
+    /// </summary>
+    public static IReadOnlyList<ScriptModuleCandidates<T>> GetCandidates<T>(
+        IEnumerable<T> entries,
+        Func<T, string> getEntryName)
+    {
+        var byPath = new Dictionary<string, ScriptModuleCandidate<T>>(StringComparer.Ordinal);
+        foreach (var value in entries)
+        {
+            var name = getEntryName(value);
+            var parsed = TryParse(name);
+            if (parsed is not null)
+            {
+                byPath[name.Replace('\\', '/')] = new ScriptModuleCandidate<T>(parsed, value);
+            }
+        }
+
+        return byPath.Values.GroupBy(candidate => candidate.Entry.ModuleName, StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => new ScriptModuleCandidates<T>(group.Key,
+                group.OrderBy(candidate => candidate.Entry.Priority).ToArray()))
+            .ToArray();
+    }
 
     /// <summary>
     /// 解析一个 zip 条目名。不是可 import 的模块条目时返回 <see langword="null"/>。
@@ -74,6 +101,12 @@ internal static class ScriptModuleNames
         return new ScriptModuleEntry(string.Join('.', segments), entryName, kind, format);
     }
 }
+
+internal sealed record ScriptModuleCandidate<T>(ScriptModuleEntry Entry, T Value);
+
+internal sealed record ScriptModuleCandidates<T>(
+    string ModuleName,
+    IReadOnlyList<ScriptModuleCandidate<T>> Entries);
 
 /// <summary>归档里一个可 import 的模块条目。</summary>
 /// <param name="ModuleName">点分模块名，例如 <c>turbolib2.utils</c>。包取包名本身。</param>
