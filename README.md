@@ -21,7 +21,7 @@ Sims 4 Mod Doctor 是一个面向 Windows 的本地离线《模拟人生 4》Mod
 - 支持部分失败报告和最近一次删除撤回
 - 通过 CLI 导出 JSON 和静态 HTML 报告
 
-Mod 冲突检测入口目前尚未开放，当前版本不会分析 DBPF 资源覆盖关系。
+Mod 冲突检测的底层（package 资源覆盖比较、脚本模块同名碰撞）已经完成，桌面入口尚未开放。
 
 ## 系统要求
 
@@ -85,12 +85,14 @@ src\Sims4ModDoctor.Desktop\bin\Release\net8.0-windows\
 
 ```text
 src/
-├─ Sims4ModDoctor.Core/          文件发现、Hash、重复分组和报告
+├─ Sims4ModDoctor.Core/          文件发现、Hash、重复分组、资源冲突、脚本碰撞和报告
+├─ Sims4ModDoctor.Packages/      DBPF 只读目录读取（LlamaLogic.Packages 适配）
 ├─ Sims4ModDoctor.Cli/           命令行扫描与报告入口
 └─ Sims4ModDoctor.Desktop/       WPF 界面和 Windows 回收站适配
 
 tests/
 ├─ Sims4ModDoctor.Core.Tests/    核心扫描与报告测试
+├─ Sims4ModDoctor.Packages.Tests/ DBPF 读取测试
 └─ Sims4ModDoctor.Desktop.Tests/ ViewModel、文件动作和 WPF 交互测试
 
 eng/
