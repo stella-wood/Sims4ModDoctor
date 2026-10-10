@@ -12,6 +12,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sims4ModDoctor.Desktop", "s
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sims4ModDoctor.Desktop.Tests", "tests\Sims4ModDoctor.Desktop.Tests\Sims4ModDoctor.Desktop.Tests.csproj", "{E9091BBD-FEE9-489D-827A-7464FE64B6E8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sims4ModDoctor.Packages", "src\Sims4ModDoctor.Packages\Sims4ModDoctor.Packages.csproj", "{B7C2F41D-95E8-4A63-8F0D-4C6E2A9B1D77}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sims4ModDoctor.Packages.Tests", "tests\Sims4ModDoctor.Packages.Tests\Sims4ModDoctor.Packages.Tests.csproj", "{5E4A8B92-1C7D-4F06-A3B5-8D91E7C24F30}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -38,5 +42,13 @@ Global
 		{E9091BBD-FEE9-489D-827A-7464FE64B6E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E9091BBD-FEE9-489D-827A-7464FE64B6E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E9091BBD-FEE9-489D-827A-7464FE64B6E8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7C2F41D-95E8-4A63-8F0D-4C6E2A9B1D77}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7C2F41D-95E8-4A63-8F0D-4C6E2A9B1D77}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7C2F41D-95E8-4A63-8F0D-4C6E2A9B1D77}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7C2F41D-95E8-4A63-8F0D-4C6E2A9B1D77}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5E4A8B92-1C7D-4F06-A3B5-8D91E7C24F30}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5E4A8B92-1C7D-4F06-A3B5-8D91E7C24F30}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5E4A8B92-1C7D-4F06-A3B5-8D91E7C24F30}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5E4A8B92-1C7D-4F06-A3B5-8D91E7C24F30}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
