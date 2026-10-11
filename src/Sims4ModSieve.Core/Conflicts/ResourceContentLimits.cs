@@ -8,7 +8,7 @@ namespace Sims4ModSieve.Core.Conflicts;
 /// <param name="MaxDecompressedBytesPerResource">单条资源解压输出的上限。</param>
 /// <param name="MaxTotalProcessedBytes">
 /// 单次比较的总处理预算：所有资源的读取字节与解压输出字节之和。
-/// 由所有并发任务共享，而不是每个任务各有一份。
+/// 由所有并发任务共享，而不是每个任务各有一份。默认不限。
 /// </param>
 /// <param name="MaxDegreeOfParallelism">同时处理的 package 数上限。</param>
 public sealed record ResourceContentLimits(
@@ -30,10 +30,11 @@ public sealed record ResourceContentLimits(
     public const long DefaultMaxDecompressedBytesPerResource = 256L * 1024 * 1024;
 
     /// <summary>
-    /// 4 GiB。足以覆盖上千组普通候选冲突；一次比较读写超过这个量，
-    /// 更可能是输入异常或范围选得过大，应停下来交给用户缩小范围。
+    /// 默认不限总量。内容是流式哈希的，总量只影响耗时、不影响内存，耗时由用户取消控制；
+    /// 防坏文件和解压炸弹靠上面两个单条上限。原来的 4 GiB 在真实 Mods 文件夹上
+    /// 会在比较中途耗尽，把后面的资源全部标成未完成。
     /// </summary>
-    public const long DefaultMaxTotalProcessedBytes = 4L * 1024 * 1024 * 1024;
+    public const long DefaultMaxTotalProcessedBytes = long.MaxValue;
 
     /// <summary>
     /// 2。比较以顺序读磁盘为主，解压与哈希的 CPU 开销不大；

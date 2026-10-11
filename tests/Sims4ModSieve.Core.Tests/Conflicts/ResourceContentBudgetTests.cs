@@ -83,4 +83,19 @@ public sealed class ResourceContentBudgetTests
         Assert.IsTrue(processed <= budget.TotalBytes);
         Assert.IsTrue(budget.TryConsume(budget.TotalBytes - processed));
     }
+
+    [TestMethod]
+    public void DefaultLimitDoesNotStopLargeScans()
+    {
+        var budget = new ResourceContentBudget(ResourceContentLimits.Default.MaxTotalProcessedBytes);
+        const long fiveHundredGiB = 500L * 1024 * 1024 * 1024;
+
+        Assert.IsTrue(budget.TryConsume(fiveHundredGiB));
+        using (var lease = budget.ReserveUpTo(int.MaxValue, bytesPerUnit: 2))
+        {
+            Assert.AreEqual(int.MaxValue, lease.GrantedBytes);
+            lease.Complete(int.MaxValue);
+        }
+        Assert.AreEqual(fiveHundredGiB + 2L * int.MaxValue, budget.ConsumedBytes);
+    }
 }
